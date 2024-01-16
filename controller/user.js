@@ -11,21 +11,21 @@ const HttpStatusCodes = require('../constants/httpStatusCodes');
 const saltRounds = 10;
 const orderStatus = require('../constants/orderStatus');
 const SUCCESS = 'success';
-
+const FAIL = 'fail';
+const INTERNAL_ERROR = 'internal error';
 
 var login = async function (req, res, next) {
   try {
     var user = await models.user.findOne({ where: { email: req.body.email } });
     if (user && await bcrypt.compare(req.body.password, user.password)) {
       var token = jwt.sign({ id: user.id, name: user.name }, secret, { expiresIn: '24h' });
-      res.json(token);
+      res.json({token:token});
     } else {
-      res.json({ error: 'Invalid login' }
-      );
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status:FAIL, error: 'Invalid login' });
     }
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send(error.message);
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, errorMessage: error.message});
   }
 }
 
@@ -38,7 +38,7 @@ var getInfo = async function (req, res, next) {
     if (user) {
       res.json({ user: user });
     } else {
-      res.status(HttpStatusCodes.NOT_FOUND).json({ error: 'user not found' });
+      res.status(HttpStatusCodes.NOT_FOUND).json({status:FAIL, error: 'user not found' });
     }
 
 
@@ -57,7 +57,7 @@ var signup = async function (req, res, next) {
     password: req.body.password,
   };//注册时需要提交的用户信息
   if (userSignData.phone == undefined || userSignData.email == undefined || userSignData.password == undefined) {
-    res.status(HttpStatusCodes.FORBIDDEN).send('Invalid input,both phone and email are required');
+    res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL,error:'Invalid input,both phone and email are required'});
     return;
   }
   try {
@@ -65,12 +65,12 @@ var signup = async function (req, res, next) {
       return;
     userSignData.password = await bcrypt.hash(req.body.password, saltRounds);
     if (!await models.user.create(userSignData)) {
-      res.status(HttpStatusCodes.FORBIDDEN).send('please check your input');
+      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL,error:'please check your input'});
       return;
     }
     res.json({ "status": SUCCESS });
   } catch (error) {
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send(error.message);
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error:error.message});
   }
 }//用户注册
 
@@ -95,10 +95,10 @@ var infoUpdate = async function (req, res, next) {
     Object.keys(allowedUserUpdateData).forEach(key => allowedUserUpdateData[key] === undefined && delete allowedUserUpdateData[key]);
 
     user.update(req.body);
-    res.send("update success!");
+    res.json({status:SUCCESS});
 
   } catch (error) {
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send(error.message);
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR,error: error.message});
   }
 }
 
@@ -106,24 +106,35 @@ var infoUpdate = async function (req, res, next) {
 var getAdvisorList = async function (req, res, next) {
   try {
     var advisor = await models.advisor.findAll({ attributes: { exclude: ['password'] } });
-    res.json({ advisor: advisor });
+    var advisorList = [];
+    for (var i = 0; i < advisor.length; i++) {
+      advisorList[i] = {
+        id: advisor[i].id,
+        name: advisor[i].name,
+        about: advisor[i].about,
+      };
+    }
+    res.json({status: SUCCESS, advisorList: advisorList });
   } catch (error) {
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send('Server error');
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
   }
 }
 
 var getAdvisorInfo = async function (req, res, next) {
   try {
-    var advisor = await models.advisor.findOne({ where: { id: req.body.id } });
-    res.json({ advisor: advisor });
+    var advisor = await models.advisor.findOne({ where: { id: req.body.id }, attributes: {
+      exclude: ['password'] 
+    } } );
+    res.json({status:SUCCESS, advisor: advisor });
   } catch (error) {
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send('Server error');
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR,error:'Server error'});
   }
 }
 
 var orderCreate = async function (req, res, next) {
   const orderData = {
     userid: req.authData.id,
+    advisorid: req.body.advisorid,
     price: req.body.price,
     content_general_situation: req.body.content_general_situation,
     content_specific_question: req.body.specific_question,
@@ -134,38 +145,62 @@ var orderCreate = async function (req, res, next) {
   try {
     var order = await models.order.create(orderData);
     if (user.coin < req.body.price) {
-      res.status(HttpStatusCodes.FORBIDDEN).send('Not enough coin');
+      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL,error:'Not enough coin'});
       return;
     }
     user.coin = user.coin - req.body.price;
     await user.save();
     order.is_finished = false;
     await order.save();
-    res.send("order success!");
+    res.json({status:SUCCESS});
   }
   catch (error) {
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send(error.message);
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR,error:error.message});
   }
 }
 
 var getMyOrders = async function (req, res, next) {
   try {
     var order = await models.order.findAll({ where: { userId: req.authData.id } });
-
-    res.json(order);
+    var orderList = [];
+    for (var i = 0; i < order.length; i++) {
+      orderList[i] = {
+        id: order[i].id,
+        advisorid: order[i].advisorid,
+        contentReplyMessage: order[i].content_reply_message,
+        isFinished: order[i].is_finished,
+        timeUrgent: order[i].time_urgent,
+        timeFinished: order[i].time_finished,
+        status: order[i].status,
+      };
+    }
+    res.json({status:SUCCESS, orderList: orderList });
   }
   catch (error) {
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send(error.message);
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR,error:error.message});
   }
 }
 
 var queryOrder = async function (req, res, next) {
   try {
     var order = await models.order.findAll({ where: { id: req.body.id } });
-    res.json(order);
+    var orderInfo = {
+      id: order.id,
+      userid: order.userid,
+      advisorid: order.advisorid,
+      price: order.price,
+      contentGeneralSituation: order.content_general_situation,
+      contentSpecificQuestion: order.content_specific_question,
+      contentReplyMessage: order.content_reply_message,
+      isFinished: order.is_finished,
+      timeUrgent: order.time_urgent,
+      timeFinished: order.time_finished,
+      status: order.status,
+    };
+    res.json(orderInfo);
   }
   catch (error) {
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send(error.message);
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR,error:error.message});
   }
 }
 
@@ -175,20 +210,20 @@ var putOrderUrgent = async function (req, res, next) {
     var user = await models.user.findByPk(order.userid);
     if (order.status == orderStatus.PENDING) {
       if (user.coin < order.price * 0.5) {
-        res.status(HttpStatusCodes.FORBIDDEN).send('Not enough coin');
+        res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL,error:'Not enough coin'});
         return;
       }
       user.coin = user.coin - order.price * 0.5;
       order.status = orderStatus.URGENT;
       await order.save();
-      res.send("put order urgent success!");
+      res.json({status:SUCCESS});
     }
     else {
-      res.status(HttpStatusCodes.FORBIDDEN).send("order status error");
+      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL,error:'Order status error'});
     }
   }
   catch (error) {
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).send(error.message);
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR,error:error.message});
   }
 }
 

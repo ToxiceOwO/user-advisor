@@ -52,11 +52,11 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DATE,
             allowNull: true
         },
-        createdAt: {
+        created_at: {
             allowNull: false,
             type: DataTypes.DATE
         },
-        updatedAt: {
+        updated_at: {
             allowNull: false,
             type: DataTypes.DATE
         },
@@ -65,6 +65,7 @@ module.exports = (sequelize, DataTypes) => {
         },
     }, {
         sequelize,
+        underscored: true,
         modelName: 'order',
     });
     return order;

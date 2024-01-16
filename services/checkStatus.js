@@ -17,7 +17,7 @@ async function schedule() {
             });
             var now = new Date();
             for (var i = 0; i < pendingOrders.length; i++) {
-                let createdAt = new Date(pendingOrders[i].createdAt);
+                let createdAt = new Date(pendingOrders[i].created_at);
                 let createdAtPlusOneDay = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
                 if (createdAtPlusOneDay < now) {
 
@@ -26,9 +26,9 @@ async function schedule() {
                 }
             }
             for (var i = 0; i < urgentOrders.length; i++) {
-                let timeUrgent = new Date(pendingOrders[i].createdAt);
+                let timeUrgent = new Date(pendingOrders[i].created_at);
                 let endUrgent = new Date(timeUrgent.getTime() +  60 * 60 * 1000);
-                let createdAt = new Date(pendingOrders[i].createdAt);
+                let createdAt = new Date(pendingOrders[i].created_at);
                 let createdAtPlusOneDay = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
                 if (endUrgent < now) {
                     (createdAtPlusOneDay < now)? await refundUrgentOrder(urgentOrders[i]) && await refundOrder(urgentOrders[i]) : await refundUrgentOrder(urgentOrders[i]);

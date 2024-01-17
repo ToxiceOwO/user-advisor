@@ -63,6 +63,13 @@ module.exports = (sequelize, DataTypes) => {
         status: {
             type: DataTypes.STRING
         },
+        type: {
+            type: DataTypes.TINYINT
+        },
+        comment: {
+            type: DataTypes.TEXT
+        },
+        
     }, {
         sequelize,
         underscored: true,

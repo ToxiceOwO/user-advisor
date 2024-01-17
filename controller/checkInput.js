@@ -51,6 +51,20 @@ function checkPassword(password, res, next) {
   }
 }//正则表达式检查密码：至少8个字符，至少一个大写字母，一个小写字母和一个数字
 
+
+function checkDate(date, res, next) {
+  try {
+    const re = /^\d{4}-\d{2}-\d{2}$/;
+    if (!re.test(String(date))) {
+      res.status(HttpStatusCodes.FORBIDDEN).send('Invalid date');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.log(error);
+  }
+}//正则表达式检查日期：YYYY-MM-DD
+
 async function signupCheck(req, res, next) {
   if (await checkEmail(req.body.email, res, next) && await checkPhone(req.body.phone, res, next) && await checkPassword(req.body.password, res, next) == true) {
     return true;
@@ -62,5 +76,6 @@ module.exports = {
   signupCheck,
   checkEmail,
   checkPhone,
-  checkPassword
+  checkPassword,
+  checkDate
 }

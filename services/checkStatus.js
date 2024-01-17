@@ -1,6 +1,6 @@
 var cron = require('node-cron');
 var models = require('../models');
-const status = require('../constants/orderStatus');
+const status = require('../constants/orders');
 
 async function schedule() {
     cron.schedule('* * * * *', async function () {

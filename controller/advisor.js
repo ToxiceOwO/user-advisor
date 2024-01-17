@@ -8,7 +8,9 @@ const e = require('express');
 const secret = 'secret';
 const HttpStatusCodes = require('../constants/httpStatusCodes');
 const advisorStatus = require('../constants/advisorStatus');
-const ORDER_STATUS = require('../constants/orderStatus.js');
+const ordersConstants = require('../constants/orders.js');
+const ORDER_STATUS = ordersConstants.ORDER_STATUS;
+const ORDER_TYPE = ordersConstants.ORDER_TYPE;
 const { where } = require('sequelize');
 const saltRounds = 10;
 const SUCCESS = 'success';
@@ -57,12 +59,23 @@ var login = async function (req, res, next) {
 
 var update = async function (req, res, next) {
   try {
+    if (req.body.password){
+      if(!check.checkPassword(req.body.password, res))
+        return;
+      }
+    if (req.body.email) {
+      if (!check.checkEmail(req.body.email, res))
+        return;
+    }
+    if (req.body.phone) {
+      if (!check.checkPhone(req.body.phone, res))
+        return;
+    }
     const allowedAdvisorUpdateData = {
       name: req.body.name,
       phone: req.body.phone,
       email: req.body.email,
       password: req.body.password,
-      status: req.body.status,
       price_per_order: req.body.price_per_order,
     };//允许更新的顾问信息
     if (req.body.password && check.checkPassword(req.body.password, res, next)) {
@@ -217,7 +230,7 @@ var changeTextPrice = async function (req, res, next) {
   try {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
-    price = pharseFloat(req.body.text_price);
+    price = parseFloat(req.body.text_price);
     if (price < MINPRICE || price > MAXPRICE) {
       res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
       return;
@@ -235,7 +248,7 @@ var changeVoicePrice = async function (req, res, next) {
   try {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
-    price = pharseFloat(req.body.voice_price);
+    price = parseFloat(req.body.voice_price);
     if (price < MINPRICE || price > MAXPRICE) {
       res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
       return;
@@ -253,7 +266,7 @@ var changeVideoPrice = async function (req, res, next) {
   try {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
-    price = pharseFloat(req.body.video_price);
+    price = parseFloat(req.body.video_price);
     if (price < MINPRICE || price > MAXPRICE) {
       res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
       return;
@@ -271,7 +284,7 @@ var changeLiveTextPrice = async function (req, res, next) {
   try {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
-    price = pharseFloat(req.body.live_text_price);
+    price = parseFloat(req.body.live_text_price);
     if (price < MINPRICE || price > MAXPRICE) {
       res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
       return;
@@ -289,7 +302,7 @@ var changeLiveVideoPrice = async function (req, res, next) {
   try {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
-    price = pharseFloat(req.body.live_video_price);
+    price = parseFloat(req.body.live_video_price);
     if (price < MINPRICE || price > MAXPRICE) {
       res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
       return;

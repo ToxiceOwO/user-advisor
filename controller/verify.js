@@ -8,7 +8,7 @@ function verifyToken(req, res, next) {
     req.authorization = bearerToken;
     jwt.verify(bearerToken, 'secret', (err, authData) => {
       if (err) {
-        res.sendStatus(HttpStatusCodes.FORBIDDEN);
+        res.sendStatus(HttpStatusCodes.FORBIDDEN).json({ status: 'fail', error: 'Invalid token.' });
       } else {
         const timeToExpiration = authData.exp - Math.floor(Date.now() / 1000);
         if (timeToExpiration < 60 * 60) {
@@ -22,7 +22,7 @@ function verifyToken(req, res, next) {
       }
     });
   } else {
-    res.sendStatus(HttpStatusCodes.FORBIDDEN);
+    res.sendStatus(HttpStatusCodes.FORBIDDEN).json({ status: 'fail', error: 'No token.' });
   }
 }
 

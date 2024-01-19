@@ -18,7 +18,6 @@ module.exports = (sequelize, DataTypes) => {
         bio: DataTypes.TEXT,
         about: DataTypes.TEXT,
         coin: DataTypes.INTEGER,
-        created_at: DataTypes.DATE,
     }, {
         sequelize,
         underscored: true,

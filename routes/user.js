@@ -28,8 +28,14 @@ router.post('/orderCreate', verifyToken, user.orderCreate)//创建订单
 
 router.get('/myOrderList', verifyToken, user.getMyOrders)//获取我的订单列表
 
-router.post('/queryOrder', verifyToken, user.queryOrder)//查询订单
+router.get('/queryOrder', verifyToken, user.queryOrder)//查询订单
 
-router.patch('/putOrderUrgent', verifyToken, user.putOrderUrgent)//加急订单')
+router.patch('/putOrderUrgent', verifyToken, user.putOrderUrgent)//加急订单
+
+router.patch('/cancelOrder', verifyToken, user.cancelOrder)//取消订单
+
+router.post('/commentOrder', verifyToken, user.commentOrder)//评论订单
+
+router.get('/getCommentList', verifyToken, user.getCommentList)//获取评论列表
 
 module.exports = router;

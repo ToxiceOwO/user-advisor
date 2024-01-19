@@ -1,6 +1,9 @@
 const { Model, DataTypes } = require('sequelize');
+const Redis = require('ioredis');
+const redis = new Redis();
 module.exports = (sequelize, DataTypes) => {
     class order extends Model {
+       
         static associate(models) {
 
             // define association here
@@ -52,14 +55,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DATE,
             allowNull: true
         },
-        created_at: {
-            allowNull: false,
-            type: DataTypes.DATE
-        },
-        updated_at: {
-            allowNull: false,
-            type: DataTypes.DATE
-        },
+
         status: {
             type: DataTypes.STRING
         },
@@ -69,11 +65,20 @@ module.exports = (sequelize, DataTypes) => {
         comment: {
             type: DataTypes.TEXT
         },
-        
+        rate: {
+            type: DataTypes.FLOAT
+        },
+
     }, {
         sequelize,
         underscored: true,
         modelName: 'order',
+        hooks: {
+            async afterUpdate(){
+            const updatedData = await order.findAll();
+            await redis.set('orders_cache', JSON.stringify(updatedData), 'EX', 12*3600);
+            }
+        }
     });
     return order;
 };

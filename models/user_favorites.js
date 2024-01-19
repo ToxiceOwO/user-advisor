@@ -30,8 +30,6 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    created_at: DataTypes.DATE,
-    updated_at: DataTypes.DATE,
   }, {
     sequelize,
     underscored: true,

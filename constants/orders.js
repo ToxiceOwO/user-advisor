@@ -1,4 +1,4 @@
-const ORDER_STATUS = {
+const orderStatus = {
   PENDING : "pending",
   URGENT : "urgent",
   FINISHED : "finished",
@@ -6,7 +6,7 @@ const ORDER_STATUS = {
   CANCELLED : "cancelled",
 }
 
-const ORDER_TYPE = {
+const orderType = {
   TEXT : 0,
   VOICE : 1,
   VIDEO : 2,
@@ -14,7 +14,7 @@ const ORDER_TYPE = {
   LIVE_VIDEO : 4,
 }
 
-const ORDER_TYPE_NUM = {
+const orderTypeNum = {
   0 : "TEXT",
   1 : "VOICE",
   2 : "VIDEO",
@@ -22,6 +22,9 @@ const ORDER_TYPE_NUM = {
   4 : "LIVE_VIDEO",
 }
 
-module.exports = ORDER_STATUS;
-module.exports = ORDER_TYPE;
-module.exports = ORDER_TYPE_NUM;
+module.exports = 
+{
+  orderStatus,
+  orderType,
+  orderTypeNum
+}

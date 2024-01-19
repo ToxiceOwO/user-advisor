@@ -9,8 +9,8 @@ const secret = 'secret';
 const HttpStatusCodes = require('../constants/httpStatusCodes');
 const advisorStatus = require('../constants/advisorStatus');
 const ordersConstants = require('../constants/orders.js');
-const ORDER_STATUS = ordersConstants.ORDER_STATUS;
-const ORDER_TYPE = ordersConstants.ORDER_TYPE;
+const orderStatus = ordersConstants.orderStatus;
+const orderType = ordersConstants.orderType;
 const { where } = require('sequelize');
 const saltRounds = 10;
 const SUCCESS = 'success';
@@ -18,6 +18,7 @@ const FAIL = 'fail';
 const INTERNAL_ERROR = 'internal error';
 const MAXPRICE = 100;
 const MINPRICE = 0;
+const coinLogs = require('../constants/coinLogs');
 
 var signup = async function (req, res, next) {
   const advisorSignupData = {
@@ -136,6 +137,7 @@ var getOrderList = async function (req, res, next) {
 }//顾问获取订单列表
 
 var respondOrder = async function (req, res, next) {
+  const t = await models.sequelize.transaction();
   try {
     const orderId = req.body.orderId;
     const advisorId = req.authData.id;
@@ -147,15 +149,30 @@ var respondOrder = async function (req, res, next) {
       res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'You are not the advisor of this order' });
       return;
     }
-    advisor.coin += order.price;
-    if (order.status == ORDER_STATUS.URGENT) {
-      advisor.coin += order.price * 0.5;
+    if (order.status != orderStatus.PENDING && order.status != orderStatus.URGENT) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid order status' });
+      return;
     }
-    order.status = advisorStatus.FINISHED;
-    await advisor.save();
-    await order.save();
+    advisor.coin += order.price;
+    var coinChange = order.price;
+    if (order.status == orderStatus.URGENT) {
+      advisor.coin += order.price * 0.5;
+      coinChange += order.price * 0.5;
+    }
+    order.status = orderStatus.FINISHED;
+    order.time_finished = Date.now();
+    await advisor.save({ transaction: t });
+    await order.save({ transaction: t });
+    await models.coin_log.create({
+      account_type: coinLogs.accountType.ADVISOR,
+      account_id: advisorId,
+      coin_change: coinChange,
+      action: coinLogs.coinAction.respondOrder}, { transaction: t });
+    await t.commit();
+    
     res.json({ "status": SUCCESS });
   } catch (error) {
+    await t.rollback();
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
   }

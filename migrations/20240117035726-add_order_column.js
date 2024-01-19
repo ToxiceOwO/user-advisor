@@ -5,13 +5,11 @@ module.exports = {
   async up (queryInterface, Sequelize) {
     await queryInterface.addColumn('orders', 'rate', {
       type: Sequelize.FLOAT,
-      defaultValue: false,
-      allowNull: false,
+      allowNull: true,
   })
   await queryInterface.addColumn('orders', 'comment', {
     type: Sequelize.TEXT,
-    defaultValue: false,
-    allowNull: false,})
+    allowNull: true,})
 
 
 },

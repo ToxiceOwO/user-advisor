@@ -7,19 +7,20 @@ var bcrypt = require('bcrypt');
 var check = require('../controller/checkInput.js');
 var Redis = require('ioredis');
 var redis = new Redis();
-var comment = require('../controller/comment');
+var comment = require('./order.js');
 const e = require('express');
 const secret = 'secret';
 const HttpStatusCodes = require('../constants/httpStatusCodes');
 const saltRounds = 10;
 const ordersConstants = require('../constants/orders.js');
 const { param } = require('../routes/advisor.js');
-const ORDER_STATUS = ordersConstants.ORDER_STATUS;
-const ORDER_TYPE = ordersConstants.ORDER_TYPE;
-const ORDER_TYPE_NUMBER = ordersConstants.ORDER_TYPE_NUMBER;
+const orderStatus = ordersConstants.orderStatus;
+const orderType = ordersConstants.orderType;
+const orderType_NUMBER = ordersConstants.orderTypeNum;
 const SUCCESS = 'success';
 const FAIL = 'fail';
 const INTERNAL_ERROR = 'internal error';
+const coinLogs = require('../constants/coinLogs');
 
 
 var login = async function (req, res, next) {
@@ -130,7 +131,14 @@ var infoUpdate = async function (req, res, next) {
 
 var getAdvisorList = async function (req, res, next) {
   try {
-    var advisor = await models.advisor.findAll({ attributes: { exclude: ['password'] } });
+    var page = parseInt(req.body.page) || 1; // 默认为第1页
+    var pageSize = parseInt(req.body.pageSize) || 10; // 默认每页显示10条
+    var offset = (page - 1) * pageSize; // 计算偏移量
+    var advisor = await models.advisor.findAll({ 
+      attributes: { exclude: ['password'] },
+      limit : pageSize,
+      offset : offset,
+    });
     var advisorList = [];
     for (var i = 0; i < advisor.length; i++) {
       advisorList[i] = {
@@ -147,12 +155,23 @@ var getAdvisorList = async function (req, res, next) {
 
 var getAdvisorInfo = async function (req, res, next) {
   try {
-    var advisor = await models.advisor.findOne({
-      where: { id: req.body.id }, attributes: {
-        exclude: ['password']
-      }
-    });
-    res.json({ status: SUCCESS, advisor: advisor });
+    var advisor = await models.advisor.findOne({where: { id: req.body.id }});
+    if (advisor == null) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not found' });
+      return;
+    }
+    var showAdvisor = {
+      id: advisor.id,
+      name: advisor.name,
+      about: advisor.about,
+      textStatus: advisor.text_status,
+      voiceStatus: advisor.voice_status,
+      videoStatus: advisor.video_status,
+      liveTextStatus: advisor.live_text_status,
+      liveVideoStatus: advisor.live_video_status,
+      coin: advisor.coin,
+    };
+    res.json({ status: SUCCESS, advisor: showAdvisor });
   } catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: 'Server error' });
   }
@@ -164,61 +183,108 @@ var orderCreate = async function (req, res, next) {
     userid: req.authData.id,
     advisorid: req.body.advisorid,
     price: req.body.price,
-    type: req.body.type,
+    type: parseInt(req.body.type),
     content_general_situation: req.body.content_general_situation,
     content_specific_question: req.body.specific_question,
-    status: ORDER_STATUS.PENDING,
+
   };//允许用户定义的订单信息,type为int,0,1,2,3,4分别为文字、语音、视频、实时文字、实时视频
+  orderData.status = orderStatus.PENDING;
   try {
     const user = await models.user.findByPk(req.authData.id);
     const advisor = await models.advisor.findByPk(req.body.advisorid);
+    if (advisor.status == false) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not available' });
+      return;
+    }
+    if (advisor == null) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not found' });
+      return;
+    }
+    var pricePerOrder;
     switch (orderData.type) {
-      case ORDER_TYPE.TEXT:
-        if (advisor.text.status == false) {
+      case orderType.TEXT:
+        if (advisor.text_status == false) {
           res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor does not support text order' });
           return;
         }
-      case ORDER_TYPE.VOICE:
-        if (advisor.voice.status == false) {
+        pricePerOrder = advisor.text_price;
+        break;
+      case orderType.VOICE:
+        if (advisor.voice_status == false) {
           res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor does not support voice order' });
           return;
         }
-      case ORDER_TYPE.VIDEO:
-        if (advisor.video.status == false) {
+          pricePerOrder = advisor.voice_price;
+        break;
+      case orderType.VIDEO:
+        if (advisor.video_status == false) {
           res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor does not support video order' });
           return;
         }
-      case ORDER_TYPE.LIVE_TEXT:
-        if (advisor.live_text.status == false) {
+        pricePerOrder = advisor.video_price;
+        break;
+      case orderType.LIVE_TEXT:
+        if (advisor.live_text_status == false) {
           res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor does not support live text order' });
           return;
         }
-      case ORDER_TYPE.LIVE_VIDEO:
-        if (advisor.live_video.status == false) {
+        pricePerOrder = advisor.live_text_price;
+        break;
+      case orderType.LIVE_VIDEO:
+        if (advisor.live_video_status == false) {
           res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor does not support live video order' });
           return;
         }
+        pricePerOrder = advisor.live_video_price;
+        break;
+      default: {
+        res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid order type' });
+        return;
+      }
     }
-
+    var count = req.body.count || 1;
     Object.keys(orderData).forEach(key => orderData[key] === undefined && delete orderData[key]);
-    var order = await models.order.create(orderData);
-    if (user.coin < req.body.price) {
+    if (user.coin < count * pricePerOrder) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin' });
       return;
     }
-    user.coin = user.coin - req.body.price;
-    await user.save();
-    order.is_finished = false;
-    await order.save();
+    var coin_change = -count * pricePerOrder;
+    user.coin = user.coin + coin_change;
+    const t = await models.sequelize.transaction();
+    orderData.price = pricePerOrder * count;
+    orderData.is_finished = false;
+    await models.order.create(orderData), { transaction: t };
+    await user.save({ transaction: t });
+    await models.coin_log.create({
+      account_type: coinLogs.accountType.USER,
+      account_id: user.id,
+      coin_change: coin_change,
+      action: coinLogs.action.createOrder,
+    }, { transaction: t });
+    await t.commit();
     res.json({ status: SUCCESS });
   }
   catch (error) {
+    t.rollback();
+    console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }
 
 var getMyOrders = async function (req, res, next) {
   try {
+    const cacheKey = 'orders_cache';
+    const cachedOrders = JSON.parse(await redis.get(cacheKey));
+    var orderList = [];
+    if (cachedOrders){
+    for (var i = 0; i < cachedOrders.length; i++) {
+      if (cachedOrders[i].userid == req.authData.id) {
+        orderList.push(cachedOrders[i]);
+      }
+    }
+    res.json({ status: SUCCESS, orderList: orderList });
+    return;
+  }
     var order = await models.order.findAll({ where: { userId: req.authData.id } });
     var orderList = [];
     for (var i = 0; i < order.length; i++) {
@@ -242,7 +308,7 @@ var getMyOrders = async function (req, res, next) {
 
 var queryOrder = async function (req, res, next) {
   try {
-    var order = await models.order.findAll({ where: { id: req.body.id } });
+    var order = await models.order.findByPk(req.body.id);
     var orderInfo = {
       id: order.id,
       type: order.type,
@@ -267,6 +333,10 @@ var queryOrder = async function (req, res, next) {
 var putOrderUrgent = async function (req, res, next) {
   try {
     var order = await models.order.findByPk(req.body.id);
+    if (!order) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order not found' });
+      return;
+    };
     var user = await models.user.findByPk(order.userid);
     if (order.status == orderStatus.PENDING) {
       if (user.coin < order.price * 0.5) {
@@ -275,7 +345,17 @@ var putOrderUrgent = async function (req, res, next) {
       }
       user.coin = user.coin - order.price * 0.5;
       order.status = orderStatus.URGENT;
-      await order.save();
+      order.time_urgent = new Date();
+      const t  = await models.sequelize.transaction();
+      await order.save( { transaction: t });
+      await user.save( { transaction: t });
+      await models.coin_log.create({
+        account_type: coinLogs.accountType.USER,
+        account_id: user.id,
+        coin_change: -order.price * 0.5,
+        action: coinLogs.action.putOrderUrgent,
+      }, { transaction: t });
+      await t.commit();
       res.json({ status: SUCCESS });
     }
     else {
@@ -283,6 +363,7 @@ var putOrderUrgent = async function (req, res, next) {
     }
   }
   catch (error) {
+    t.rollback();
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }
@@ -291,12 +372,24 @@ var commentOrder = async function (req, res, next) {
   try {
     var order = await models.order.findByPk(req.body.id);
     var advisor = await models.advisor.findByPk(order.advisorid);
+    if (req.body.comment == null) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid comment' });
+      return;
+    }
+    if (req.body.rate < 0 || req.body.rate > 5) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid rate' });
+      return;
+    }
+    if (order.comment != null) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already commented' });
+      return;
+    }
     if (order.status == orderStatus.FINISHED) {
       order.rate = req.body.rate;
       order.comment = req.body.comment;
       await order.save();
-      res.json({ status: SUCCESS });
-    }
+      res.json({ status: SUCCESS });}
+
     else {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error' });
     }
@@ -308,7 +401,10 @@ var commentOrder = async function (req, res, next) {
 
 var getCommentList = async function (req, res, next) {
   try {
-    const comments = await comment.getAdvisorComments(req.body.advisorid);
+    var page = parseInt(req.body.page) || 1; // 默认为第1页
+    var pageSize = parseInt(req.body.pageSize) || 10; // 默认每页显示10条
+    var offset = (page - 1) * pageSize; // 计算偏移量
+    const comments = await comment.getAdvisorComments(req.body.advisorid,pageSize,offset);
     res.json({ status: SUCCESS, comments: comments });
   }
   catch (error) {
@@ -316,6 +412,48 @@ var getCommentList = async function (req, res, next) {
   }
 }
 
+var cancelOrder = async function (req, res, next) {
+  try {
+    var order = await models.order.findByPk(req.body.id);
+    var user = await models.user.findByPk(order.userid);
+    if (req.authData.id != order.userid) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not your order' });
+      return;
+    }
+    if (order.status == orderStatus.PENDING) {
+      user.coin = user.coin + order.price;
+      order.status = orderStatus.CANCELLED;
+      await user.save();
+      await order.save();
+      res.json({ status: SUCCESS });
+    }
+    else {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error' });
+    }
+  }
+  catch (error) {
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+  }
+}
+
+var tipAdvisor = async function (req, res, next) {
+  try {
+    var advisor = await models.advisor.findByPk(req.body.id);
+    var user = await models.user.findByPk(req.authData.id);
+    if (user.coin < req.body.coin) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin' });
+      return;
+    }
+    user.coin = user.coin - req.body.coin;
+    advisor.coin = advisor.coin + req.body.coin;
+    await user.save();
+    await advisor.save();
+    res.json({ status: SUCCESS });
+  }
+  catch (error) {
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+  }
+}
 
 module.exports = {
   login,
@@ -328,4 +466,7 @@ module.exports = {
   getMyOrders,
   queryOrder,
   putOrderUrgent,
+  commentOrder,
+  getCommentList,
+  cancelOrder,
 }

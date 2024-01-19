@@ -19,6 +19,7 @@ const INTERNAL_ERROR = 'internal error';
 const MAXPRICE = 100;
 const MINPRICE = 0;
 const coinLogs = require('../constants/coinLogs');
+const order_ = require('../controller/order')
 
 var signup = async function (req, res, next) {
   const advisorSignupData = {
@@ -28,7 +29,7 @@ var signup = async function (req, res, next) {
     password: req.body.password,
   };//允许注册的顾问信息
   if (advisorSignupData.phone == undefined || advisorSignupData.email == undefined || advisorSignupData.password == undefined) {
-    res.status(HttpStatusCodes.FORBIDDEN).json({ status:FAIL,error: 'Invalid input,both phone and email are required' });
+    res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid input,both phone and email are required' });
     return;
   }
   try {
@@ -36,34 +37,36 @@ var signup = async function (req, res, next) {
       return;
     advisorSignupData.password = await bcrypt.hash(req.body.password, saltRounds);
     await models.advisor.create(advisorSignupData);
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
-}}//顾问注册
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+  }
+}//顾问注册
 
 var login = async function (req, res, next) {
   try {
     var advisor = await models.advisor.findOne({ where: { email: req.body.email } });
     if (advisor && await bcrypt.compare(req.body.password, advisor.password)) {
       var token = jwt.sign({ id: advisor.id, name: advisor.name }, secret, { expiresIn: '24h' });
-      res.json({status:SUCCESS, token: token })
+      res.json({ status: SUCCESS, token: token })
     } else {
-      res.json({status:FAIL, error: 'Invalid login,please check your enter.' }
+      res.json({ status: FAIL, error: 'Invalid login,please check your enter.' }
       );
     }
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
-}}
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+  }
+}
 //顾问登录
 
 var update = async function (req, res, next) {
   try {
-    if (req.body.password){
-      if(!check.checkPassword(req.body.password, res))
+    if (req.body.password) {
+      if (!check.checkPassword(req.body.password, res))
         return;
-      }
+    }
     if (req.body.email) {
       if (!check.checkEmail(req.body.email, res))
         return;
@@ -85,11 +88,11 @@ var update = async function (req, res, next) {
     Object.keys(allowedAdvisorUpdateData).forEach(key => allowedAdvisorUpdateData[key] === undefined && delete allowedAdvisorUpdateData[key]);
     const advisor = await models.advisor.findByPk(req.authData.id);
     await advisor.update(allowedAdvisorUpdateData);
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
 
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR,error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问信息更新
 
@@ -101,14 +104,14 @@ var getAdvisorInfo = async function (req, res, next) {
       attributes: { exclude: ['password'] }
     });
     if (advisor) {
-      res.json({status:SUCCESS, advisor: advisor });
+      res.json({ status: SUCCESS, advisor: advisor });
     } else {
       res.status(HttpStatusCodes.NOT_FOUND).json({ error: 'advisor not found' });
     }
 
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问访问自己主页
 
@@ -117,22 +120,20 @@ var patch = async function (req, res, next) {
     var advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.update(req.body);
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json ({status:INTERNAL_ERROR,error: error.message});
-}//顾问信息部分更新
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+  }//顾问信息部分更新
 }
 
 var getOrderList = async function (req, res, next) {
   try {
-    const advisorId = req.authData.id;
-    const advisor = await models.advisor.findByPk(advisorId);
-    const orders = await models.order.findAll({ where: { advisorid: advisorId } });
-    res.json({ "status": SUCCESS, orders: orders });
+    const orders = await order_.getOrdersByAdvisorId(req.authData.id);
+    res.json({ status: SUCCESS, orderList: orders });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问获取订单列表
 
@@ -146,11 +147,11 @@ var respondOrder = async function (req, res, next) {
     order.content_reply_message = req.body.content_reply_message;
     order.is_finished = true;
     if (order.advisorid != advisorId) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'You are not the advisor of this order' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'You are not the advisor of this order' });
       return;
     }
     if (order.status != orderStatus.PENDING && order.status != orderStatus.URGENT) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid order status' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid order status' });
       return;
     }
     advisor.coin += order.price;
@@ -167,14 +168,15 @@ var respondOrder = async function (req, res, next) {
       account_type: coinLogs.accountType.ADVISOR,
       account_id: advisorId,
       coin_change: coinChange,
-      action: coinLogs.coinAction.respondOrder}, { transaction: t });
+      action: coinLogs.coinAction.respondOrder
+    }, { transaction: t });
     await t.commit();
-    
-    res.json({ "status": SUCCESS });
+
+    res.json({ status: SUCCESS });
   } catch (error) {
     await t.rollback();
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问响应订单
 
@@ -184,10 +186,10 @@ var changeTextStatus = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.text_status = !advisor.text_status;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问开关文字咨询，无需前端传入参数
 
@@ -197,10 +199,10 @@ var changeVoiceStatus = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.voice_status = !advisor.voice_status;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问开关语音咨询
 
@@ -210,10 +212,10 @@ var changeVideoStatus = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.video_status = !advisor.video_status;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问开关视频咨询
 
@@ -223,10 +225,10 @@ var changeLiveTextStatus = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.live_text_status = !advisor.live_text_status;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({status:INTERNAL_ERROR, error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问开关文字直播
 
@@ -236,10 +238,10 @@ var changeLiveVideoStatus = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.live_video_status = !advisor.live_video_status;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json ({status:INTERNAL_ERROR,error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问开关视频直播
 
@@ -249,15 +251,15 @@ var changeTextPrice = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     price = parseFloat(req.body.text_price);
     if (price < MINPRICE || price > MAXPRICE) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid price' });
       return;
     }
     advisor.text_price = price;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json ({status:INTERNAL_ERROR,error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问修改文字咨询价格，前端传入的是一个对象，对象的属性是text_price
 
@@ -267,15 +269,15 @@ var changeVoicePrice = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     price = parseFloat(req.body.voice_price);
     if (price < MINPRICE || price > MAXPRICE) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid price' });
       return;
     }
     advisor.voice_price = price;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json ({status:INTERNAL_ERROR,error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问修改语音咨询价格,前端传入的是一个对象，对象的属性是voice_price
 
@@ -285,15 +287,15 @@ var changeVideoPrice = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     price = parseFloat(req.body.video_price);
     if (price < MINPRICE || price > MAXPRICE) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid price' });
       return;
     }
     advisor.video_price = price;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json ({status:INTERNAL_ERROR,error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问修改视频咨询价格，前端传入的是一个对象，对象的属性是video_price
 
@@ -303,15 +305,15 @@ var changeLiveTextPrice = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     price = parseFloat(req.body.live_text_price);
     if (price < MINPRICE || price > MAXPRICE) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid price' });
       return;
     }
     advisor.live_text_price = price;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json ({status:INTERNAL_ERROR,error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问修改文字直播价格，前端传入的是一个对象，对象的属性是live_text_price
 
@@ -321,15 +323,15 @@ var changeLiveVideoPrice = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     price = parseFloat(req.body.live_video_price);
     if (price < MINPRICE || price > MAXPRICE) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({status:FAIL, error: 'Invalid price' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid price' });
       return;
     }
-    advisor.live_video_price =  price;
+    advisor.live_video_price = price;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json ({status:INTERNAL_ERROR,error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问修改视频直播价格，前端传入的是一个对象，对象的属性是live_video_price
 
@@ -339,10 +341,10 @@ var changeAdvisorStatus = async function (req, res, next) {
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.status = !advisor.status;
     await advisor.save();
-    res.json({ "status": SUCCESS });
+    res.json({ status: SUCCESS });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json ({status:INTERNAL_ERROR,error: error.message});
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问开关顾问状态
 

@@ -74,11 +74,21 @@ module.exports = (sequelize, DataTypes) => {
         underscored: true,
         modelName: 'order',
         hooks: {
-            async afterUpdate(){
-            const updatedData = await order.findAll();
-            await redis.set('orders_cache', JSON.stringify(updatedData), 'EX', 12*3600);
-            }
+            async afterCreate(order) {
+                var order_ = require('../controller/order');
+                await order_.updateCacheByUserId(order.userid);
+                await order_.updateCacheByAdvisorId(order.advisorid);
+            },
+            async afterUpdate(order) {
+                var order_ = require('../controller/order');
+                await order_.updateCacheByUserId(order.userid);
+                await order_.updateCacheByAdvisorId(order.advisorid);
+            },
+            async afterDestroy(order) {
+                var order_ = require('../controller/order');
+                await order_.updateCacheByUserId(order.userid);
+                await order_.updateCacheByAdvisorId(order.advisorid);
         }
-    });
+    }});
     return order;
 };

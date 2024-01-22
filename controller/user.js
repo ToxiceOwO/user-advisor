@@ -183,7 +183,6 @@ var orderCreate = async function (req, res, next) {
   const orderData = {
     userid: req.authData.id,
     advisorid: req.body.advisorid,
-    price: req.body.price,
     typeid: parseInt(req.body.typeid),
     content_general_situation: req.body.content_general_situation,
     content_specific_question: req.body.specific_question,
@@ -193,7 +192,7 @@ var orderCreate = async function (req, res, next) {
   const t = await models.sequelize.transaction();
   try {
     const user = await models.user.findByPk(req.authData.id);
-    const advisor = await models.advisor.findByPk(req.body.advisorid);
+    const advisor = await models.advisor.findByPk(orderData.advisorid);
     if (advisor.status == false) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not available' });
       return;
@@ -203,12 +202,12 @@ var orderCreate = async function (req, res, next) {
       return;
     }
     var pricePerOrder;
-    var orderType = models.advisor_order_type.findOne({ where: { advisorid: advisor.id, typeid: typeid } });
+    var orderType = await models.advisor_order_type.findOne({ where: { advisorid: advisor.id, typeid: orderData.typeid } });
     if (orderType == null) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order type not found' });
       return;
     }
-    if (orderType.status == false) {
+    if (orderType.status == 0) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order type not available' });
       return;
     };

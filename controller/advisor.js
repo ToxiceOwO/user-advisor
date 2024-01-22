@@ -368,9 +368,11 @@ var addOrderType = async function (req, res, next) {
     const advisorid = req.authData.id;
     const orderType = req.body.orderType;
     const price = req.body.price;
+    const typeid = req.body.typeid;
     await models.advisor_order_type.create({
       advisorid: advisorid,
       order_type: orderType,
+      typeid: typeid,
       price: price,
     });
     res.json({ status: SUCCESS });
@@ -383,7 +385,7 @@ var addOrderType = async function (req, res, next) {
 var changeOrderType = async function (req, res, next) {
   try {
     const advisorid = req.authData.id;
-    const typeid = req.body.typeid;
+    const typeid = parseInt(req.body.typeid);
     const orderType = req.body.orderType;
     const price = req.body.price;
     const status = req.body.status;
@@ -426,5 +428,5 @@ module.exports = {
   showCoinLogs,
   addOrderType,
   changeOrderType,
-  
+
 }; 

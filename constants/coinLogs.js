@@ -6,6 +6,8 @@ const coinAction = {
   urgentExpired: 4,
   respondOrder: 5,
   reward: 6,
+  tipAdvisor: 7,
+  refundOrder: 8,
 }
 
 const accountType = {

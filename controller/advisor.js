@@ -16,7 +16,7 @@ const saltRounds = 10;
 const SUCCESS = 'success';
 const FAIL = 'fail';
 const INTERNAL_ERROR = 'internal error';
-const MAXPRICE = 100;
+const MAXPRICE = 1000;
 const MINPRICE = 0;
 const coinLogs = require('../constants/coinLogs');
 const order_ = require('../controller/order')
@@ -348,7 +348,61 @@ var changeAdvisorStatus = async function (req, res, next) {
   }
 }//顾问开关顾问状态
 
+var showCoinLogs = async function (req, res, next) {
+  try {
+    const advisorId = req.authData.id;
+    const coinLogs = await models.coin_log.findAll({
+      where: {
+        account_type: coinLogs.accountType.ADVISOR,
+        account_id: advisorId
+      }
+    });
+    res.json({ status: SUCCESS, coinLogs: coinLogs });
+  } catch (error) {
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+  }
+}//顾问获取自己的金币记录
 
+var addOrderType = async function (req, res, next) {
+  try {
+    const advisorid = req.authData.id;
+    const orderType = req.body.orderType;
+    const price = req.body.price;
+    await models.advisor_order_type.create({
+      advisorid: advisorid,
+      order_type: orderType,
+      price: price,
+    });
+    res.json({ status: SUCCESS });
+  }
+  catch (error) {
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+  }
+}
+
+var changeOrderType = async function (req, res, next) {
+  try {
+    const advisorid = req.authData.id;
+    const typeid = req.body.typeid;
+    const orderType = req.body.orderType;
+    const price = req.body.price;
+    const status = req.body.status;
+    await models.advisor_order_type.update({
+      type: orderType,
+      price: price,
+      status: status,
+    }, {
+      where: {
+        advisorid: advisorid,
+        typeid: typeid,
+      }
+    });
+    res.json({ status: SUCCESS });
+  }
+  catch (error) {
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+  }
+}
 
 module.exports = {
   signup,
@@ -369,4 +423,8 @@ module.exports = {
   changeVideoPrice,
   changeLiveTextPrice,
   changeLiveVideoPrice,
+  showCoinLogs,
+  addOrderType,
+  changeOrderType,
+  
 }; 

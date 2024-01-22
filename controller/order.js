@@ -41,16 +41,30 @@ async function getOrdersByAdvisorId(advisorId) {
 }
 
 
-async function getAdvisorComments(advisorId) {
+async function getAdvisorComments(advisorId,pagesize,offset) {
     const cacheKey = `advisorOrders:${advisorId}`;
     try {
         // 尝试从 Redis 获取缓存的评论
         const cachedOrders = await redis.get(cacheKey);
         if (cachedOrders) {
-            orders = JSON.parse(cachedOrders); // 缓存命中，返回解析后的评论数据
+            var orders = JSON.parse(cachedOrders);
+
+        }
+        else {
+            // 缓存未命中，从数据库中读取评论
+            var orders = await models.order.findAll({
+                where: {
+                    advisorid: advisorId,
+                    comment: {
+                        [Op.ne]: null
+                    }
+                },
+            });
+            // 将数据库读取到的评论数据写入 Redis
+            await redis.set(cacheKey, JSON.stringify(orders), 'EX', 12 * 3600);
         }
         var comments = [];
-        for (var i = 0; i < orders.length; i++) {
+        for (var i = offset; i < offset + pagesize && i < orders.length; i++) {
             if (orders[i].comment) {
                 comments.push({ rate: orders[i].rate, comment: orders[i].comment });
             }

@@ -47,4 +47,10 @@ router.patch('/changeLiveTextPrice', verifyToken, advisor.changeLiveTextPrice);/
 
 router.patch('/changeLiveVideoPrice', verifyToken, advisor.changeLiveVideoPrice);//顾问修改直播视频价格
 
+router.get('/showCoinLogs', verifyToken, advisor.showCoinLogs);//查看金币日志
+
+router.put('/addOrderType', verifyToken, advisor.addOrderType);//添加接单类型
+
+router.patch('/changeOrderType', verifyToken, advisor.changeOrderType);//修改接单类型
+
 module.exports = router;

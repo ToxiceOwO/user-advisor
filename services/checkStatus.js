@@ -2,6 +2,7 @@ var cron = require('node-cron');
 var models = require('../models');
 const orders = require('../constants/orders');
 const status = orders.orderStatus;
+const coinLogs = require('../constants/coinLogs');
 
 async function schedule() {
     cron.schedule('* * * * *', async function () {
@@ -19,16 +20,16 @@ async function schedule() {
             var now = new Date();
             for (var i = 0; i < pendingOrders.length; i++) {
                 let createdAt = new Date(pendingOrders[i].createdAt);
-                let createdAtPlusOneDay = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+                let createdAtPlusOneDay = new Date(createdAt.getTime() +  60 * 1000);
                 if (createdAtPlusOneDay < now) {
                     await refundOrder(pendingOrders[i]);
                 }
             }
             for (var i = 0; i < urgentOrders.length; i++) {
                 let timeUrgent = new Date(urgentOrders[i].time_urgent);
-                let endUrgent = new Date(timeUrgent.getTime() +  60 * 60 * 1000);
+                let endUrgent = new Date(timeUrgent.getTime() +   60 * 1000);
                 let createdAt = new Date(urgentOrders[i].createdAt);
-                let createdAtPlusOneDay = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+                let createdAtPlusOneDay = new Date(createdAt.getTime() +  60 * 1000);
                 if (endUrgent < now) {
                     (createdAtPlusOneDay < now)? await refundUrgentOrder(urgentOrders[i]) && await refundOrder(urgentOrders[i]) : await refundUrgentOrder(urgentOrders[i]);
                 }
@@ -43,10 +44,10 @@ async function schedule() {
 
 
 async function refundOrder(order) {
+    const t = await models.sequelize.transaction();
     try {
         var user = await models.user.findByPk(order.userid);
         user.coin += order.price;
-        const t = await models.sequelize.transaction();
         await user.save( {transaction: t});
         order.status = status.EXPIRED;
         await order.save( {transaction: t});
@@ -54,7 +55,7 @@ async function refundOrder(order) {
             account_type: coinLogs.accountType.USER,
             account_id: user.id,
             coin_change: order.price,
-            action: coinLogs.action.refundOrder,
+            action: coinLogs.coinAction.refundOrder,
           }, { transaction: t });
         await t.commit();
     } catch (error) {
@@ -64,8 +65,8 @@ async function refundOrder(order) {
 }
 
 async function refundUrgentOrder(order) {
+    const t = await models.sequelize.transaction();
     try {
-        const t = await models.sequelize.transaction();
         var user = await models.user.findByPk(order.userid);
         user.coin += order.price * 0.5;
         await user.save( {transaction: t});
@@ -75,7 +76,7 @@ async function refundUrgentOrder(order) {
             account_type: coinLogs.accountType.USER,
             account_id: user.id,
             coin_change: order.price * 0.5,
-            action: coinLogs.action.refundUrgentOrder,
+            action: coinLogs.coinAction.refundOrder,
           }, { transaction: t });
         await t.commit();
     } catch (error) {

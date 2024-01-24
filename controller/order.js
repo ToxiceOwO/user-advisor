@@ -56,7 +56,7 @@ async function updateCommentsCache(advisorId) {
     }
 }
 
-async function getAdvisorComments(advisorId,pagesize,offset) {
+async function getAdvisorComments(advisorId, pagesize, offset) {
     const cacheKey = `advisor_comments:${advisorId}`;
     try {
         // 尝试从 Redis 获取缓存的评论

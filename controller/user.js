@@ -168,6 +168,9 @@ var getAdvisorInfo = async function (req, res, next) {
       name: advisor.name,
       about: advisor.about,
       orderType: orderType,
+      comments_count: advisor.comments_count,
+      rate: advisor.rate,
+      ontime_rate: advisor.ontime_rate,
     };
     res.json({ status: SUCCESS, advisor: showAdvisor });
   } catch (error) {

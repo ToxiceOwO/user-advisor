@@ -51,6 +51,6 @@ router.get('/showCoinLogs', verifyToken, advisor.showCoinLogs);//查看金币日
 
 //router.put('/addOrderType', verifyToken, advisor.addOrderType);//添加接单类型
 
-router.patch('/changeOrderType', verifyToken, advisor.changeOrderType);//修改接单类型
+router.patch('/changeOrderType', verifyToken, advisor.changeOrderType);//修改接单类型，包括金币等，若无此类型则添加
 
 module.exports = router;

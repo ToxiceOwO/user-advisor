@@ -165,7 +165,7 @@ var respondOrder = async function (req, res, next) {
     order.status = orderStatus.FINISHED;
     order.time_finished = Date.now();
     await advisor.increment('coin', { by: coinChange, transaction: t });
-    await orderres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });({ transaction: t });
+    await orderres.json({ status: SUCCESS, code: errorCode.NO_ERROR }); ({ transaction: t });
     await models.coin_log.create({
       account_type: coinLogs.accountType.ADVISOR,
       account_id: advisorId,
@@ -345,7 +345,7 @@ var changeAdvisorStatus = async function (req, res, next) {
     res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message, code:errorCode.INVALID_ORDER_TYPE });
   }
 }//顾问开关顾问状态
 
@@ -391,6 +391,10 @@ var changeOrderType = async function (req, res, next) {
     const type = parseInt(req.body.type);
     const price = req.body.price;
     const status = req.body.status;
+    if (type < 0 || type > 4) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid type' });
+      return;
+    }
     var currentType = await models.advisor_order_type.findOne({
       where: {
         advisorid: advisorid,
@@ -400,7 +404,7 @@ var changeOrderType = async function (req, res, next) {
     if (currentType) {
       currentType.price = price;
       currentType.status = status;
-      await res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
+      await res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
     }
     else {
       await models.advisor_order_type.create({

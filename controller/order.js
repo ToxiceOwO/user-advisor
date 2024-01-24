@@ -3,6 +3,7 @@ var redis = new Redis();
 var models = require('../models');
 var express = require('express');
 var Op = require('sequelize').Op;
+const random = Math.random();
 
 async function getOrdersByUserId(userId) {
     try {
@@ -12,7 +13,7 @@ async function getOrdersByUserId(userId) {
             return JSON.parse(cachedOrders);
         }
         const orders = await models.order.findAll({ where: { userid: userId } });
-        await redis.set(cacheKey, JSON.stringify(orders), 'EX', 12 * 3600);
+        redis.set(cacheKey, JSON.stringify(orders), 'EX', random * 12 * 3600); //设置随机过期时间防止缓存雪崩
         return orders;
     } catch (error) {
         console.error("Error in getOrdersByUserId:", error);
@@ -32,7 +33,7 @@ async function getOrdersByAdvisorId(advisorId) {
                 advisorid: advisorId
             }
         })
-        await redis.set(cacheKey, JSON.stringify(orders), 'EX', 12 * 3600);
+        redis.set(cacheKey, JSON.stringify(orders), 'EX', random * 12 * 3600);
         return orders;
     } catch (error) {
         console.error("Error in getOrdersByAdvisorId:", error);
@@ -48,7 +49,7 @@ async function updateCommentsCache(advisorId) {
                 advisorid: advisorId
             }
         })
-        await redis.set(cacheKey, JSON.stringify(comments), 'EX', 12 * 3600);
+        redis.set(cacheKey, JSON.stringify(comments), 'EX', random * 12 * 3600);
     } catch (error) {
         console.error("Error in updateCommentsCache:", error);
         throw error;
@@ -72,7 +73,7 @@ async function getAdvisorComments(advisorId,pagesize,offset) {
                 },
             });
             // 将数据库读取到的评论数据写入 Redis
-            await redis.set(cacheKey, JSON.stringify(orders), 'EX', 12 * 3600);
+            redis.set(cacheKey, JSON.stringify(orders), 'EX', random * 12 * 3600);
         }
         var comments = [];
         for (var i = offset; i < offset + pagesize && i < orders.length; i++) {
@@ -95,7 +96,7 @@ async function updateCacheByUserId(userId) {
                 userid: userId
             }
         })
-        await redis.set(cacheKey, JSON.stringify(orders), 'EX', 12 * 3600);
+        redis.set(cacheKey, JSON.stringify(orders), 'EX', random * 12 * 3600);
     } catch (error) {
         console.error("Error in updateCacheByUserId:", error);
         throw error;
@@ -110,7 +111,7 @@ async function updateCacheByAdvisorId(advisorId) {
                 advisorid: advisorId
             }
         })
-        await redis.set(cacheKey, JSON.stringify(orders), 'EX', 12 * 3600);
+        redis.set(cacheKey, JSON.stringify(orders), 'EX', random * 12 * 3600);
     } catch (error) {
         console.error("Error in updateCacheByAdvisorId:", error);
         throw error;

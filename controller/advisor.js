@@ -20,6 +20,7 @@ const MAXPRICE = 1000;
 const MINPRICE = 0;
 const coinLogs = require('../constants/coinLogs');
 const order_ = require('../controller/order')
+const errorCode = require('../constants/errorCode');
 
 var signup = async function (req, res, next) {
   const advisorSignupData = {
@@ -29,7 +30,7 @@ var signup = async function (req, res, next) {
     password: req.body.password,
   };//允许注册的顾问信息
   if (advisorSignupData.phone == undefined || advisorSignupData.email == undefined || advisorSignupData.password == undefined) {
-    res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid input,both phone and email are required' });
+    res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid input,both phone and email are required', code: errorCode.MISSING_INPUT });
     return;
   }
   try {
@@ -37,7 +38,7 @@ var signup = async function (req, res, next) {
       return;
     advisorSignupData.password = await bcrypt.hash(req.body.password, saltRounds);
     await models.advisor.create(advisorSignupData);
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -47,12 +48,14 @@ var signup = async function (req, res, next) {
 var login = async function (req, res, next) {
   try {
     var advisor = await models.advisor.findOne({ where: { email: req.body.email } });
-    if (advisor && await bcrypt.compare(req.body.password, advisor.password)) {
+    if (!advisor) {
+      res.status(HttpStatusCodes.NOT_FOUND).json({ status: FAIL, error: 'Advisor not found', code: errorCode.ACCOUNT_NOT_FOUND });
+    }
+    if (await bcrypt.compare(req.body.password, advisor.password)) {
       var token = jwt.sign({ id: advisor.id, name: advisor.name }, secret, { expiresIn: '24h' });
-      res.json({ status: SUCCESS, token: token })
+      res.json({ status: SUCCESS, token: token });
     } else {
-      res.json({ status: FAIL, error: 'Invalid login,please check your enter.' }
-      );
+      res.json({ status: FAIL, error: 'Invalid password,please check your enter.', code: errorCode.PASSWORD_NOT_MATCH });
     }
   } catch (error) {
     console.log(error);
@@ -88,7 +91,7 @@ var update = async function (req, res, next) {
     Object.keys(allowedAdvisorUpdateData).forEach(key => allowedAdvisorUpdateData[key] === undefined && delete allowedAdvisorUpdateData[key]);
     const advisor = await models.advisor.findByPk(req.authData.id);
     await advisor.update(allowedAdvisorUpdateData);
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
 
   } catch (error) {
     console.log(error);
@@ -106,7 +109,7 @@ var getAdvisorInfo = async function (req, res, next) {
     if (advisor) {
       res.json({ status: SUCCESS, advisor: advisor });
     } else {
-      res.status(HttpStatusCodes.NOT_FOUND).json({ error: 'advisor not found' });
+      res.status(HttpStatusCodes.NOT_FOUND).json({ status: FAIL, error: 'advisor not found', code: errorCode.ADVISOR_NOT_FOUND });
     }
 
   } catch (error) {
@@ -120,7 +123,7 @@ var patch = async function (req, res, next) {
     var advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.update(req.body);
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -147,23 +150,22 @@ var respondOrder = async function (req, res, next) {
     order.content_reply_message = req.body.content_reply_message;
     order.is_finished = true;
     if (order.advisorid != advisorId) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'You are not the advisor of this order' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'You are not the advisor of this order', code: errorCode.ORDER_PERMISSION_AUTH_FAILED });
       return;
     }
     if (order.status != orderStatus.PENDING && order.status != orderStatus.URGENT) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid order status' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid order status', code: errorCode.ORDER_STATUS_NOT_MATCH });
       return;
     }
     advisor.coin += order.price;
     var coinChange = order.price;
     if (order.status == orderStatus.URGENT) {
-      advisor.coin += order.price * 0.5;
       coinChange += order.price * 0.5;
     }
     order.status = orderStatus.FINISHED;
     order.time_finished = Date.now();
-    await advisor.save({ transaction: t });
-    await order.save({ transaction: t });
+    await advisor.increment('coin', { by: coinChange, transaction: t });
+    await orderres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });({ transaction: t });
     await models.coin_log.create({
       account_type: coinLogs.accountType.ADVISOR,
       account_id: advisorId,
@@ -172,7 +174,7 @@ var respondOrder = async function (req, res, next) {
     }, { transaction: t });
     await t.commit();
 
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   } catch (error) {
     await t.rollback();
     console.log(error);
@@ -186,8 +188,8 @@ var changeTextStatus = async function (req, res, next) {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.text_status = !advisor.text_status;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -199,8 +201,8 @@ var changeVoiceStatus = async function (req, res, next) {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.voice_status = !advisor.voice_status;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -212,8 +214,8 @@ var changeVideoStatus = async function (req, res, next) {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.video_status = !advisor.video_status;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -225,8 +227,8 @@ var changeLiveTextStatus = async function (req, res, next) {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.live_text_status = !advisor.live_text_status;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -238,8 +240,8 @@ var changeLiveVideoStatus = async function (req, res, next) {
     const advisorId = req.authData.id;
     const advisor = await models.advisor.findByPk(advisorId);
     advisor.live_video_status = !advisor.live_video_status;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -256,8 +258,8 @@ var changeTextPrice = async function (req, res, next) {
       return;
     }
     advisor.text_price = price;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -274,8 +276,8 @@ var changeVoicePrice = async function (req, res, next) {
       return;
     }
     advisor.voice_price = price;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -292,8 +294,8 @@ var changeVideoPrice = async function (req, res, next) {
       return;
     }
     advisor.video_price = price;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -310,8 +312,8 @@ var changeLiveTextPrice = async function (req, res, next) {
       return;
     }
     advisor.live_text_price = price;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -328,8 +330,8 @@ var changeLiveVideoPrice = async function (req, res, next) {
       return;
     }
     advisor.live_video_price = price;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await advisorres.json({ status: SUCCESS, code:errorCode.NO_ERROR  });();
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -339,10 +341,8 @@ var changeLiveVideoPrice = async function (req, res, next) {
 var changeAdvisorStatus = async function (req, res, next) {
   try {
     const advisorId = req.authData.id;
-    const advisor = await models.advisor.findByPk(advisorId);
-    advisor.status = !advisor.status;
-    await advisor.save();
-    res.json({ status: SUCCESS });
+    await models.advisor.update({ status: models.sequelize.literal('NOT status') }, { where: { id: advisorId } });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   } catch (error) {
     console.log(error);
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -377,7 +377,7 @@ var addOrderType = async function (req, res, next) {
       type: type,
       price: price,
     });
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
   }
   catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -391,7 +391,7 @@ var changeOrderType = async function (req, res, next) {
     const type = parseInt(req.body.type);
     const price = req.body.price;
     const status = req.body.status;
-    var currentType = await models.advisor_order_type.findOne( {
+    var currentType = await models.advisor_order_type.findOne({
       where: {
         advisorid: advisorid,
         type: type,
@@ -400,7 +400,7 @@ var changeOrderType = async function (req, res, next) {
     if (currentType) {
       currentType.price = price;
       currentType.status = status;
-      await currentType.save();
+      await res.json({ status: SUCCESS, code:errorCode.NO_ERROR  });
     }
     else {
       await models.advisor_order_type.create({
@@ -410,7 +410,7 @@ var changeOrderType = async function (req, res, next) {
         status: status,
       });
     }
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   }
   catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });

@@ -22,20 +22,24 @@ const FAIL = 'fail';
 const INTERNAL_ERROR = 'internal error';
 const coinLogs = require('../constants/coinLogs');
 const order_ = require('../controller/order.js');
-
+const errorCode = require('../constants/errorCode.js');
 
 var login = async function (req, res, next) {
   try {
     var user = await models.user.findOne({ where: { email: req.body.email } });
-    if (user && await bcrypt.compare(req.body.password, user.password)) {
+    if (user == null) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'User not found', code: errorCode.ACCOUNT_NOT_FOUND });
+      return;
+    };
+    if (await bcrypt.compare(req.body.password, user.password)) {
       var token = jwt.sign({ id: user.id, name: user.name }, secret, { expiresIn: '24h' });
       res.json({ status: SUCCESS, token: token });
     } else {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid login' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid login', code: errorCode.PASSWORD_NOT_MATCH });
     }
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, errorMessage: error.message });
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, errorMessage: error.message, code: errorCode.NO_ERROR });
   }
 }
 
@@ -48,7 +52,7 @@ var getInfo = async function (req, res, next) {
     if (user) {
       res.json({ user: user });
     } else {
-      res.status(HttpStatusCodes.NOT_FOUND).json({ status: FAIL, error: 'user not found' });
+      res.status(HttpStatusCodes.NOT_FOUND).json({ status: FAIL, error: 'user not found', code: errorCode.USER_NOT_FOUND, });
     }
 
 
@@ -67,18 +71,15 @@ var signup = async function (req, res, next) {
     password: req.body.password,
   };//注册时需要提交的用户信息
   if (userSignData.phone == undefined || userSignData.email == undefined || userSignData.password == undefined) {
-    res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid input,both phone and email are required' });
+    res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid input,both phone and email are required', code: MISSING_INPUT });
     return;
   }
   try {
     if (!(await check.signupCheck(req, res, next)))
       return;
     userSignData.password = await bcrypt.hash(req.body.password, saltRounds);
-    if (!await models.user.create(userSignData)) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'please check your input' });
-      return;
-    }
-    res.json({ status: SUCCESS });
+    await models.user.create(userSignData)
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   } catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
@@ -122,7 +123,7 @@ var infoUpdate = async function (req, res, next) {
     Object.keys(allowedUserUpdateData).forEach(key => allowedUserUpdateData[key] === undefined && delete allowedUserUpdateData[key]);
 
     user.update(req.body);
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
 
   } catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -158,7 +159,7 @@ var getAdvisorInfo = async function (req, res, next) {
   try {
     var advisor = await models.advisor.findOne({ where: { id: req.body.id } });
     if (advisor == null) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not found' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not found', code: errorCode.ADVISOR_NOT_FOUND });
       return;
     }
     var orderType = await models.advisor_order_type.findAll({ where: { advisorid: advisor.id } });
@@ -184,8 +185,8 @@ var orderCreate = async function (req, res, next) {
     content_specific_question: req.body.specific_question,
 
   };//允许用户定义的订单信息,type为int,0,1,2,3,4分别为文字、语音、视频、实时文字、实时视频
-  if (orderData.type >4 || orderData.type <0) {
-    res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid order type' });
+  if (orderData.type > 4 || orderData.type < 0) {
+    res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid order type', code: errorCode.INVALID_ORDER_TYPE });
     return;
   }
   orderData.status = orderStatus.PENDING;
@@ -194,37 +195,36 @@ var orderCreate = async function (req, res, next) {
     const user = await models.user.findByPk(req.authData.id);
     const advisor = await models.advisor.findByPk(orderData.advisorid);
     if (advisor.status == false) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not available' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not available', code: errorCode.ADVISOR_NOT_AVAILABLE });
       return;
     }
     if (advisor == null) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not found' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not found', code: errorCode.ADVISOR_NOT_FOUND });
       return;
     }
     var pricePerOrder;
     var orderType = await models.advisor_order_type.findOne({ where: { advisorid: advisor.id, type: orderData.type } });
     if (orderType == null) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order type not found' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order type not found', code: errorCode.ORDER_TYPE_NOT_FOUND });
       return;
     }
     if (orderType.status == 0) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order type not available' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order type not available', code: errorCode.ORDER_TYPE_NOT_AVAILABLE });
       return;
     };
     pricePerOrder = orderType.price;
     var count = req.body.count || 1;
     Object.keys(orderData).forEach(key => orderData[key] === undefined && delete orderData[key]);
     if (user.coin < count * pricePerOrder) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin', code: errorCode.NOT_ENOUGH_COIN });
       return;
     }
     var coin_change = -count * pricePerOrder;
-    user.coin = user.coin + coin_change;
     orderData.price = pricePerOrder * count;
     orderData.is_finished = false;
     orderData.type = orderType.type;
     await models.order.create(orderData), { transaction: t };
-    await user.save({ transaction: t });
+    await user.increment('coin', { by: coin_change, transaction: t });
     await models.coin_log.create({
       account_type: coinLogs.accountType.USER,
       account_id: user.id,
@@ -232,7 +232,7 @@ var orderCreate = async function (req, res, next) {
       action: coinLogs.coinAction.createOrder,
     }, { transaction: t });
     await t.commit();
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   }
   catch (error) {
     t.rollback();
@@ -277,35 +277,34 @@ var queryOrder = async function (req, res, next) {
 }
 
 var putOrderUrgent = async function (req, res, next) {
+  const t = await models.sequelize.transaction();
   try {
     var order = await models.order.findByPk(req.body.id);
     if (!order) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order not found' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order not found', code: errorCode.ORDER_NOT_FOUND });
       return;
     };
     var user = await models.user.findByPk(order.userid);
     if (order.status == orderStatus.PENDING) {
       if (user.coin < order.price * 0.5) {
-        res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin' });
+        res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin', code: errorCode.NOT_ENOUGH_COIN });
         return;
       }
-      user.coin = user.coin - order.price * 0.5;
       order.status = orderStatus.URGENT;
       order.time_urgent = new Date();
-      const t = await models.sequelize.transaction();
       await order.save({ transaction: t });
-      await user.save({ transaction: t });
+      await user.decrement('coin', { by: order.price * 0.5, transaction: t });
       await models.coin_log.create({
         account_type: coinLogs.accountType.USER,
         account_id: user.id,
         coin_change: -order.price * 0.5,
-        action: coinLogs.action.putOrderUrgent,
+        action: coinLogs.coinAction.putOrderUrgent,
       }, { transaction: t });
       await t.commit();
-      res.json({ status: SUCCESS });
+      res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
     }
     else {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order is NOT pending!', code: errorCode.ORDER_STATUS_NOT_MATCH });
     }
   }
   catch (error) {
@@ -318,19 +317,19 @@ var commentOrder = async function (req, res, next) {
   try {
     var order = await models.order.findByPk(req.body.id);
     if (req.body.comment == null) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid comment' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid comment', code: errorCode.MISSING_INPUT });
       return;
     }
     if (req.body.rate < 0 || req.body.rate > 5) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid rate' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid rate', code: errorCode.INVALID_RATE });
       return;
     }
     if (order.is_comment == true) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already commented' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already commented', code: errorCode.COMMENT_ALREADY_EXIST });
       return;
     }
     if (order.status == orderStatus.FINISHED) {
-     await models.comment.create({
+      await models.comment.create({
         userid: order.userid,
         advisorid: order.advisorid,
         comment: req.body.comment,
@@ -338,11 +337,11 @@ var commentOrder = async function (req, res, next) {
       });
       await order.update({ is_comment: true });
       order_.updateCommentsCache(order.advisorid);
-      res.json({ status: SUCCESS });
+      res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
     }
 
     else {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error', code: errorCode.ORDER_STATUS_NOT_MATCH });
     }
   }
   catch (error) {
@@ -368,29 +367,29 @@ var cancelOrder = async function (req, res, next) {
     var order = await models.order.findByPk(req.body.id);
     var user = await models.user.findByPk(order.userid);
     if (req.authData.id != order.userid) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not your order' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not your order', code: errorCode.ORDER_PERMISSION_AUTH_FAILED });
       return;
     }
     if (order.status == orderStatus.PENDING || order.status == orderStatus.URGENT) {
-      user.coin = user.coin + order.price;
+      var coinChange = order.price;
       if (order.status == orderStatus.URGENT) {
-        user.coin = user.coin + order.price * 0.5;
+        coinChange = order.price * 1.5;
       }
       order.status = orderStatus.CANCELLED;
       const t = await models.sequelize.transaction();
       await models.coin_log.create({
         account_type: coinLogs.accountType.USER,
         account_id: user.id,
-        coin_change: order.price,
+        coin_change: coinChange,
         action: coinLogs.coinAction.cancelOrder,
       }, { transaction: t });
-      await user.save({ transaction: t });
+      await user.increment('coin', { by: coinChange, transaction: t });
       await order.save({ transaction: t });
       await t.commit();
-      res.json({ status: SUCCESS });
+      res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
     }
     else {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error', code: errorCode.ORDER_STATUS_NOT_MATCH });
     }
   }
   catch (error) {
@@ -405,7 +404,7 @@ var tipAdvisor = async function (req, res, next) {
     var advisor = await models.advisor.findByPk(req.body.id);
     var user = await models.user.findByPk(req.authData.id);
     if (user.coin < req.body.coin) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin' });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin', code: errorCode.NOT_ENOUGH_COIN });
       return;
     }
     user.coin = user.coin - req.body.coin;
@@ -422,10 +421,10 @@ var tipAdvisor = async function (req, res, next) {
       coin_change: req.body.coin,
       action: coinLogs.coinAction.tipAdvisor,
     }, { transaction: t });
-    await user.save({ transaction: t });
-    await advisor.save({ transaction: t });
+    await user.decrement('coin', { by: req.body.coin, transaction: t });
+    await advisor.increment('coin', { by: req.body.coin, transaction: t });
     await t.commit();
-    res.json({ status: SUCCESS });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   }
   catch (error) {
     await t.rollback();
@@ -435,20 +434,15 @@ var tipAdvisor = async function (req, res, next) {
 
 var favoriteAdvisor = async function (req, res, next) {
   try {
-    var user = await models.user.findByPk(req.authData.id);
-    var advisor = await models.advisor.findByPk(req.body.id);
-    if (advisor == null) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not found' });
+    if (await models.user_fav.findOne({ where: { userid: req.authData.id, advisorid: req.body.id } })) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already favorite', code: errorCode.FAVORITE_ALREADY_EXIST });
       return;
     }
-    if (user.favorite_advisor.indexOf(advisor.id) != -1) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already favorite' });
-      return;
-    }
-    user.favorite_advisor.push(advisor.id);
-    user.changed('favorite_advisor', true);
-    await user.save();
-    res.json({ status: SUCCESS });
+    await models.user_fav.create({
+      userid: req.authData.id,
+      advisorid: req.body.id,
+    });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   }
   catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -457,17 +451,8 @@ var favoriteAdvisor = async function (req, res, next) {
 
 var getFavoriteList = async function (req, res, next) {
   try {
-    var user = await models.user.findByPk(req.authData.id);
-    var favoriteList = [];
-    for (var i = 0; i < user.favorite_advisor.length; i++) {
-      var advisor = await models.advisor.findByPk(user.favorite_advisor[i]);
-      favoriteList.push({
-        id: advisor.id,
-        name: advisor.name,
-        about: advisor.about,
-      });
-    }
-    res.json({ status: SUCCESS, favoriteList: favoriteList });
+    var userFav = await models.user_fav.findAll({ where: { userid: req.authData.id } });
+    res.json({ status: SUCCESS, favoriteList: userFav });
   }
   catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
@@ -476,16 +461,12 @@ var getFavoriteList = async function (req, res, next) {
 
 var deleteFavorite = async function (req, res, next) {
   try {
-    var user = await models.user.findByPk(req.authData.id);
-    var index = user.favorite_advisor.indexOf(parseInt(req.body.id));
-    if (index == -1) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not favorite' });
+    if (!await models.user_fav.findOne({ where: { userid: req.authData.id, advisorid: req.body.id } })) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not favorite', code: errorCode.FAVORITE_NOT_FOUND });
       return;
     }
-    user.favorite_advisor.splice(index, 1);
-    user.changed('favorite_advisor', true);
-    await user.save();
-    res.json({ status: SUCCESS });
+    await models.user_fav.destroy({ where: { userid: req.authData.id, advisorid: req.body.id } });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   }
   catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });

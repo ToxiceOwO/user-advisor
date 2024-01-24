@@ -92,7 +92,7 @@ async function refundOrder(order) {
     try {
         var user = await models.user.findByPk(order.userid);
         user.coin += order.price;
-        await user.save( {transaction: t});
+        await user.increment('coin', { by: order.price, transaction: t });
         order.status = status.EXPIRED;
         await order.save( {transaction: t});
         await models.coin_log.create({
@@ -113,7 +113,7 @@ async function refundUrgentOrder(order) {
     try {
         var user = await models.user.findByPk(order.userid);
         user.coin += order.price * 0.5;
-        await user.save( {transaction: t});
+        await user.increment('coin', { by: order.price * 0.5, transaction: t });
         order.status = status.PENDING;
         await order.save( {transaction: t});
         await models.coin_log.create({

@@ -2,8 +2,8 @@
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('advisor_order_type', {
+  async up (queryInterface, Sequelize) {
+    await queryInterface.createTable('comments', {
       id: {
         allowNull: false,
         autoIncrement: true,
@@ -17,16 +17,25 @@ module.exports = {
           key: 'id'
         },
       },
-      type: {
-        type: Sequelize.STRING,
+      userid: {
+        type: Sequelize.INTEGER,
+        references: {
+          model: 'users',
+          key: 'id'
+        },
       },
-      price: {
-        type: Sequelize.INTEGER
+      orderid: {
+        type: Sequelize.INTEGER,
+        references: {
+          model: 'orders',
+          key: 'id'
+        },
       },
-      status: {
-        type: Sequelize.TINYINT,
-        allowNull: false,
-        defaultValue: 0,
+      rate: {
+        type: Sequelize.FLOAT
+      },
+      comment: {
+        type: Sequelize.TEXT
       },
       created_at: {
         allowNull: false,
@@ -36,10 +45,10 @@ module.exports = {
         allowNull: false,
         type: Sequelize.DATE
     }
-  });
-  },
+  })
+},
 
-  async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('advisor_order_type');
-}
+  async down (queryInterface, Sequelize) {
+    await queryInterface.dropTable('comments');
+  }
 };

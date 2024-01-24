@@ -1,7 +1,7 @@
 const { Model, DataTypes } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
 
-    class advisor_order_type extends Model {
+    class comment extends Model {
         static associate(models) {
 
             // define association here
@@ -9,15 +9,16 @@ module.exports = (sequelize, DataTypes) => {
     }
 
 
-    advisor_order_type.init({
+    comment.init({
         advisorid: DataTypes.INTEGER,
-        type: DataTypes.TINYINT,
-        status: DataTypes.BOOLEAN,
-        price: DataTypes.INTEGER,
+        userid: DataTypes.INTEGER,
+        orderid: DataTypes.INTEGER,
+        rate: DataTypes.FLOAT,
+        comment: DataTypes.TEXT,
     }, {
         sequelize,
         underscored: true,
-        modelName: 'advisor_order_type',
+        modelName: 'comment',
     });
-    return advisor_order_type;
+    return comment;
 };

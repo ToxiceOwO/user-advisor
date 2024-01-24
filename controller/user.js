@@ -29,7 +29,7 @@ var login = async function (req, res, next) {
     var user = await models.user.findOne({ where: { email: req.body.email } });
     if (user && await bcrypt.compare(req.body.password, user.password)) {
       var token = jwt.sign({ id: user.id, name: user.name }, secret, { expiresIn: '24h' });
-      res.json({ token: token });
+      res.json({ status: SUCCESS, token: token });
     } else {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid login' });
     }
@@ -161,16 +161,12 @@ var getAdvisorInfo = async function (req, res, next) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Advisor not found' });
       return;
     }
+    var orderType = await models.advisor_order_type.findAll({ where: { advisorid: advisor.id } });
     var showAdvisor = {
       id: advisor.id,
       name: advisor.name,
       about: advisor.about,
-      textStatus: advisor.text_status,
-      voiceStatus: advisor.voice_status,
-      videoStatus: advisor.video_status,
-      liveTextStatus: advisor.live_text_status,
-      liveVideoStatus: advisor.live_video_status,
-      coin: advisor.coin,
+      orderType: orderType,
     };
     res.json({ status: SUCCESS, advisor: showAdvisor });
   } catch (error) {
@@ -183,11 +179,15 @@ var orderCreate = async function (req, res, next) {
   const orderData = {
     userid: req.authData.id,
     advisorid: req.body.advisorid,
-    typeid: parseInt(req.body.typeid),
+    type: parseInt(req.body.type),
     content_general_situation: req.body.content_general_situation,
     content_specific_question: req.body.specific_question,
 
   };//允许用户定义的订单信息,type为int,0,1,2,3,4分别为文字、语音、视频、实时文字、实时视频
+  if (orderData.type >4 || orderData.type <0) {
+    res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid order type' });
+    return;
+  }
   orderData.status = orderStatus.PENDING;
   const t = await models.sequelize.transaction();
   try {
@@ -202,7 +202,7 @@ var orderCreate = async function (req, res, next) {
       return;
     }
     var pricePerOrder;
-    var orderType = await models.advisor_order_type.findOne({ where: { advisorid: advisor.id, typeid: orderData.typeid } });
+    var orderType = await models.advisor_order_type.findOne({ where: { advisorid: advisor.id, type: orderData.type } });
     if (orderType == null) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order type not found' });
       return;
@@ -222,6 +222,7 @@ var orderCreate = async function (req, res, next) {
     user.coin = user.coin + coin_change;
     orderData.price = pricePerOrder * count;
     orderData.is_finished = false;
+    orderData.type = orderType.type;
     await models.order.create(orderData), { transaction: t };
     await user.save({ transaction: t });
     await models.coin_log.create({
@@ -316,7 +317,6 @@ var putOrderUrgent = async function (req, res, next) {
 var commentOrder = async function (req, res, next) {
   try {
     var order = await models.order.findByPk(req.body.id);
-    var advisor = await models.advisor.findByPk(order.advisorid);
     if (req.body.comment == null) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid comment' });
       return;
@@ -325,14 +325,19 @@ var commentOrder = async function (req, res, next) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid rate' });
       return;
     }
-    if (order.comment != null) {
+    if (order.is_comment == true) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already commented' });
       return;
     }
     if (order.status == orderStatus.FINISHED) {
-      order.rate = req.body.rate;
-      order.comment = req.body.comment;
-      await order.save();
+     await models.comment.create({
+        userid: order.userid,
+        advisorid: order.advisorid,
+        comment: req.body.comment,
+        rate: req.body.rate,
+      });
+      await order.update({ is_comment: true });
+      order_.updateCommentsCache(order.advisorid);
       res.json({ status: SUCCESS });
     }
 

@@ -6,7 +6,7 @@ var Op = require('sequelize').Op;
 
 async function getOrdersByUserId(userId) {
     try {
-        const cacheKey = `userOrders:${userId}`;
+        const cacheKey = `user_orders:${userId}`;
         const cachedOrders = await redis.get(cacheKey);
         if (cachedOrders) {
             return JSON.parse(cachedOrders);
@@ -22,7 +22,7 @@ async function getOrdersByUserId(userId) {
 
 async function getOrdersByAdvisorId(advisorId) {
     try {
-        const cacheKey = `advisorOrders:${advisorId}`;
+        const cacheKey = `advisor_orders:${advisorId}`;
         const cachedOrders = await redis.get(cacheKey);
         if (cachedOrders) {
             return JSON.parse(cachedOrders);
@@ -40,9 +40,23 @@ async function getOrdersByAdvisorId(advisorId) {
     }
 }
 
+async function updateCommentsCache(advisorId) {
+    try {
+        const cacheKey = `advisor_comments:${advisorId}`;
+        const comments = await models.comment.findAll({
+            where: {
+                advisorid: advisorId
+            }
+        })
+        await redis.set(cacheKey, JSON.stringify(comments), 'EX', 12 * 3600);
+    } catch (error) {
+        console.error("Error in updateCommentsCache:", error);
+        throw error;
+    }
+}
 
 async function getAdvisorComments(advisorId,pagesize,offset) {
-    const cacheKey = `advisorOrders:${advisorId}`;
+    const cacheKey = `advisor_comments:${advisorId}`;
     try {
         // 尝试从 Redis 获取缓存的评论
         const cachedOrders = await redis.get(cacheKey);
@@ -52,12 +66,9 @@ async function getAdvisorComments(advisorId,pagesize,offset) {
         }
         else {
             // 缓存未命中，从数据库中读取评论
-            var orders = await models.order.findAll({
+            var orders = await models.comment.findAll({
                 where: {
                     advisorid: advisorId,
-                    comment: {
-                        [Op.ne]: null
-                    }
                 },
             });
             // 将数据库读取到的评论数据写入 Redis
@@ -78,7 +89,7 @@ async function getAdvisorComments(advisorId,pagesize,offset) {
 
 async function updateCacheByUserId(userId) {
     try {
-        const cacheKey = `userOrders:${userId}`;
+        const cacheKey = `user_orders:${userId}`;
         const orders = await models.order.findAll({
             where: {
                 userid: userId
@@ -93,7 +104,7 @@ async function updateCacheByUserId(userId) {
 
 async function updateCacheByAdvisorId(advisorId) {
     try {
-        const cacheKey = `advisorOrders:${advisorId}`;
+        const cacheKey = `advisor_orders:${advisorId}`;
         const orders = await models.order.findAll({
             where: {
                 advisorid: advisorId
@@ -112,4 +123,5 @@ module.exports = {
     getAdvisorComments,
     updateCacheByUserId,
     updateCacheByAdvisorId,
+    updateCommentsCache
 };

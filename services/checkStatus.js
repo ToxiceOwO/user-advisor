@@ -1,8 +1,11 @@
 var cron = require('node-cron');
 var models = require('../models');
 const orders = require('../constants/orders');
+const orders_ = require('../controller/order');
 const status = orders.orderStatus;
 const coinLogs = require('../constants/coinLogs');
+const Redis = require('ioredis');
+const redis = new Redis();
 
 async function schedule() {
     cron.schedule('* * * * *', async function () {
@@ -34,6 +37,10 @@ async function schedule() {
                     (createdAtPlusOneDay < now)? await refundUrgentOrder(urgentOrders[i]) && await refundOrder(urgentOrders[i]) : await refundUrgentOrder(urgentOrders[i]);
                 }
             } 
+            var advisors = await models.advisor.findAll();
+            for (var i = 0; i < advisors.length; i++) {
+                await updateAdvisorInfo(advisors[i].id);
+            }
             
             console.log('check success')
         } catch (error) {
@@ -41,6 +48,43 @@ async function schedule() {
         }
     })
 }
+
+async function updateAdvisorInfo(advisorId) {
+    try {
+        const orders = await orders_.getOrdersByAdvisorId(advisorId);
+        const comment = await orders_.getAdvisorComments(advisorId);
+        var totalRate = 0;
+        var finishedOrders = 0;
+        for (let i = 0; i < comment.length; i++) {
+            totalRate += comment[i].rate;
+        }
+        for (let i = 0; i < orders.length; i++) {
+            if (orders[i].status === status.FINISHED) {
+                finishedOrders++;
+            }
+        }
+        const result = await models.sequelize.transaction(async (t) => {
+            const advisor = await models.advisor.findByPk(advisorId, { transaction: t });
+            advisor.rate = totalRate / comment.length;
+            if (comment.length === 0) {
+                advisor.rate = 0;
+            }
+            advisor.comments_count = comment.length;
+            advisor.orders_count = orders.length;
+            advisor.ontime_rate = finishedOrders / orders.length;
+            if (orders.length === 0) {
+                advisor.ontime_rate = 0;
+            }
+            await advisor.save({transaction: t});});
+        return result;
+    } 
+    catch (error) {
+
+        console.log(error);
+    }
+}
+ 
+
 
 
 async function refundOrder(order) {
@@ -88,5 +132,5 @@ async function refundUrgentOrder(order) {
 module.exports = {
     schedule,
     refundOrder,
-    refundUrgentOrder
+    refundUrgentOrder,
 }

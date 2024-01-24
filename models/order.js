@@ -62,13 +62,9 @@ module.exports = (sequelize, DataTypes) => {
         type: {
             type: DataTypes.TINYINT
         },
-        comment: {
-            type: DataTypes.TEXT
+        is_comment: {
+            type: DataTypes.BOOLEAN
         },
-        rate: {
-            type: DataTypes.FLOAT
-        },
-
     }, {
         sequelize,
         underscored: true,

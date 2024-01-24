@@ -180,6 +180,7 @@ var respondOrder = async function (req, res, next) {
   }
 }//顾问响应订单
 
+/*
 var changeTextStatus = async function (req, res, next) {
   try {
     const advisorId = req.authData.id;
@@ -334,7 +335,7 @@ var changeLiveVideoPrice = async function (req, res, next) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }//顾问修改视频直播价格，前端传入的是一个对象，对象的属性是live_video_price
-
+*/
 var changeAdvisorStatus = async function (req, res, next) {
   try {
     const advisorId = req.authData.id;
@@ -363,16 +364,17 @@ var showCoinLogs = async function (req, res, next) {
   }
 }//顾问获取自己的金币记录
 
+/*
 var addOrderType = async function (req, res, next) {
   try {
     const advisorid = req.authData.id;
     const orderType = req.body.orderType;
     const price = req.body.price;
-    const typeid = req.body.typeid;
+    const type = req.body.type;
     await models.advisor_order_type.create({
       advisorid: advisorid,
       order_type: orderType,
-      typeid: typeid,
+      type: type,
       price: price,
     });
     res.json({ status: SUCCESS });
@@ -381,24 +383,33 @@ var addOrderType = async function (req, res, next) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }
+*/
 
 var changeOrderType = async function (req, res, next) {
   try {
     const advisorid = req.authData.id;
-    const typeid = parseInt(req.body.typeid);
-    const orderType = req.body.orderType;
+    const type = parseInt(req.body.type);
     const price = req.body.price;
     const status = req.body.status;
-    await models.advisor_order_type.update({
-      type: orderType,
-      price: price,
-      status: status,
-    }, {
+    var currentType = await models.advisor_order_type.findOne( {
       where: {
         advisorid: advisorid,
-        typeid: typeid,
+        type: type,
       }
     });
+    if (currentType) {
+      currentType.price = price;
+      currentType.status = status;
+      await currentType.save();
+    }
+    else {
+      await models.advisor_order_type.create({
+        advisorid: advisorid,
+        type: type,
+        price: price,
+        status: status,
+      });
+    }
     res.json({ status: SUCCESS });
   }
   catch (error) {
@@ -415,7 +426,7 @@ module.exports = {
   changeAdvisorStatus,
   getOrderList,
   respondOrder,
-  changeTextStatus,
+  /*changeTextStatus,
   changeVoiceStatus,
   changeVideoStatus,
   changeLiveTextStatus,
@@ -424,9 +435,9 @@ module.exports = {
   changeVoicePrice,
   changeVideoPrice,
   changeLiveTextPrice,
-  changeLiveVideoPrice,
+  changeLiveVideoPrice,*/
   showCoinLogs,
-  addOrderType,
+  //addOrderType,
   changeOrderType,
 
 }; 

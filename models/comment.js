@@ -19,6 +19,18 @@ module.exports = (sequelize, DataTypes) => {
         sequelize,
         underscored: true,
         modelName: 'comment',
+        async afterCreate(comment) {
+            var order_ = require('../controller/order');
+            await order_.updateCommentsCache(comment.advisorid);
+        },
+        async afterUpdate(order) {
+            var order_ = require('../controller/order');
+            await order_.updateCommentsCache(comment.advisorid);
+        },
+        async afterDestroy(order) {
+            var order_ = require('../controller/order');
+            await order_.updateCommentsCache(comment.advisorid);
+    }
     });
     return comment;
 };

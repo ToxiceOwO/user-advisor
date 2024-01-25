@@ -333,6 +333,7 @@ var commentOrder = async function (req, res, next) {
       await models.comment.create({
         userid: order.userid,
         advisorid: order.advisorid,
+        orderid: order.id,
         comment: req.body.comment,
         rate: req.body.rate,
       });

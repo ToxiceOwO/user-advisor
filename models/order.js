@@ -72,18 +72,18 @@ module.exports = (sequelize, DataTypes) => {
         hooks: {
             async afterCreate(order) {
                 var order_ = require('../controller/order');
-                await order_.updateCacheByUserId(order.userid);
-                await order_.updateCacheByAdvisorId(order.advisorid);
+                await order_.updateOrderCacheByUserId(order.userid);
+                await order_.updateOrderCacheByAdvisorId(order.advisorid);
             },
             async afterUpdate(order) {
                 var order_ = require('../controller/order');
-                await order_.updateCacheByUserId(order.userid);
-                await order_.updateCacheByAdvisorId(order.advisorid);
+                await order_.updateOrderCacheByUserId(order.userid);
+                await order_.updateOrderCacheByAdvisorId(order.advisorid);
             },
             async afterDestroy(order) {
                 var order_ = require('../controller/order');
-                await order_.updateCacheByUserId(order.userid);
-                await order_.updateCacheByAdvisorId(order.advisorid);
+                await order_.updateOrderCacheByUserId(order.userid);
+                await order_.updateOrderCacheByAdvisorId(order.advisorid);
         }
     }});
     return order;

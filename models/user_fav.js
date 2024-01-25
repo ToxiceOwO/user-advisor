@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
     user_fav.init({
         userid: DataTypes.INTEGER,
         advisorid: DataTypes.INTEGER,
+        is_del: DataTypes.BOOLEAN,
     }, {
         sequelize,
         underscored: true,

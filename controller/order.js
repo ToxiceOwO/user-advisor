@@ -88,7 +88,7 @@ async function getAdvisorComments(advisorId, pagesize, offset) {
     }
 }
 
-async function updateCacheByUserId(userId) {
+async function updateOrderCacheByUserId(userId) {
     try {
         const cacheKey = `user_orders:${userId}`;
         const orders = await models.order.findAll({
@@ -103,7 +103,7 @@ async function updateCacheByUserId(userId) {
     }
 }
 
-async function updateCacheByAdvisorId(advisorId) {
+async function updateOrderCacheByAdvisorId(advisorId) {
     try {
         const cacheKey = `advisor_orders:${advisorId}`;
         const orders = await models.order.findAll({
@@ -122,7 +122,7 @@ module.exports = {
     getOrdersByUserId,
     getOrdersByAdvisorId,
     getAdvisorComments,
-    updateCacheByUserId,
-    updateCacheByAdvisorId,
+    updateOrderCacheByUserId,
+    updateOrderCacheByAdvisorId,
     updateCommentsCache
 };

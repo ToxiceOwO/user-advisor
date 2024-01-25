@@ -165,7 +165,7 @@ var respondOrder = async function (req, res, next) {
     order.status = orderStatus.FINISHED;
     order.time_finished = Date.now();
     await advisor.increment('coin', { by: coinChange, transaction: t });
-    await orderres.json({ status: SUCCESS, code: errorCode.NO_ERROR }); ({ transaction: t });
+    await order.save({ transaction: t });
     await models.coin_log.create({
       account_type: coinLogs.accountType.ADVISOR,
       account_id: advisorId,

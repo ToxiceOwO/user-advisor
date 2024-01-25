@@ -52,7 +52,7 @@ async function schedule() {
 async function updateAdvisorInfo(advisorId) {
     try {
         const orders = await orders_.getOrdersByAdvisorId(advisorId);
-        const comment = await orders_.getAdvisorComments(advisorId, 100000, 0);
+        const comment = await orders_.getAdvisorComments(advisorId, 1000, 0);
         var totalRate = 0;
         var finishedOrders = 0;
         for (let i = 0; i < comment.length; i++) {
@@ -91,8 +91,12 @@ async function updateAdvisorInfo(advisorId) {
 async function refundOrder(order) {
     const t = await models.sequelize.transaction();
     try {
+        const result = await models.sequelize.transaction(async (t) => {
+            order = await models.order.findByPk(order.id, { transaction: t });
+        if (order.status != status.PENDING) {
+            throw new Error(9000);
+        }
         var user = await models.user.findByPk(order.userid);
-        user.coin += order.price;
         await user.increment('coin', { by: order.price, transaction: t });
         order.status = status.EXPIRED;
         await order.save({ transaction: t });
@@ -102,7 +106,8 @@ async function refundOrder(order) {
             coin_change: order.price,
             action: coinLogs.coinAction.refundOrder,
         }, { transaction: t });
-        await t.commit();
+    });
+        return result;
     } catch (error) {
         t.rollback();
         console.log(error);

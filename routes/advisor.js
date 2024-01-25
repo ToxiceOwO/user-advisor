@@ -6,7 +6,7 @@ var verifyToken = require('../controller/verify').verifyToken;
 var advisor = require('../controller/advisor');
 const e = require('express');
 const secret = 'secret';
-
+const accountType = 1;
 
 
 router.post('/signup',advisor.signup );//顾问注册

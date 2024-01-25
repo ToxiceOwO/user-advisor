@@ -6,6 +6,7 @@ var verifyToken = require('../controller/verify').verifyToken;
 var user = require('../controller/user');
 const e = require('express');
 const secret = 'secret';
+const accountType = 0;
 
 
 

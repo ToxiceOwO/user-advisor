@@ -52,7 +52,7 @@ var login = async function (req, res, next) {
       res.status(HttpStatusCodes.NOT_FOUND).json({ status: FAIL, error: 'Advisor not found', code: errorCode.ACCOUNT_NOT_FOUND });
     }
     if (await bcrypt.compare(req.body.password, advisor.password)) {
-      var token = jwt.sign({ id: advisor.id, name: advisor.name }, secret, { expiresIn: '24h' });
+      var token = jwt.sign({ id: advisor.id, accountType: 1 }, secret, { expiresIn: '24h' });
       res.json({ status: SUCCESS, token: token });
     } else {
       res.json({ status: FAIL, error: 'Invalid password,please check your enter.', code: errorCode.PASSWORD_NOT_MATCH });
@@ -351,14 +351,19 @@ var changeAdvisorStatus = async function (req, res, next) {
 
 var showCoinLogs = async function (req, res, next) {
   try {
+    var page = parseInt(req.body.page) || 1; // 默认为第1页
+    var pageSize = parseInt(req.body.pageSize) || 10; // 默认每页显示10条
+    var offset = (page - 1) * pageSize; // 计算偏移量
     const advisorId = req.authData.id;
-    const coinLogs = await models.coin_log.findAll({
+    const coinLog = await models.coin_log.findAll({
       where: {
         account_type: coinLogs.accountType.ADVISOR,
-        account_id: advisorId
-      }
+        account_id: advisorId,
+      },
+      limit: pageSize,
+      offset: offset,
     });
-    res.json({ status: SUCCESS, coinLogs: coinLogs });
+    res.json({ status: SUCCESS, coinLogs: coinLog });
   } catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }

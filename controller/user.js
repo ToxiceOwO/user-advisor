@@ -32,7 +32,7 @@ var login = async function (req, res, next) {
       return;
     };
     if (await bcrypt.compare(req.body.password, user.password)) {
-      var token = jwt.sign({ id: user.id, name: user.name }, secret, { expiresIn: '24h' });
+      var token = jwt.sign({ id: user.id, accountType:0 }, secret, { expiresIn: '24h' });
       res.json({ status: SUCCESS, token: token });
     } else {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid login', code: errorCode.PASSWORD_NOT_MATCH });
@@ -293,9 +293,7 @@ var putOrderUrgent = async function (req, res, next) {
         res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin', code: errorCode.NOT_ENOUGH_COIN });
         return;
       }
-      order.status = orderStatus.URGENT;
-      order.time_urgent = new Date();
-      await order.save({ transaction: t });
+      await order.update({ status: orderStatus.URGENT, time_urgent: new Date() }, { transaction: t });
       await user.decrement('coin', { by: order.price * 0.5, transaction: t });
       await models.coin_log.create({
         account_type: coinLogs.accountType.USER,
@@ -378,7 +376,6 @@ var cancelOrder = async function (req, res, next) {
       if (order.status == orderStatus.URGENT) {
         coinChange = order.price * 1.5;
       }
-      order.status = orderStatus.CANCELLED;
       const t = await models.sequelize.transaction();
       await models.coin_log.create({
         account_type: coinLogs.accountType.USER,
@@ -387,7 +384,7 @@ var cancelOrder = async function (req, res, next) {
         action: coinLogs.coinAction.cancelOrder,
       }, { transaction: t });
       await user.increment('coin', { by: coinChange, transaction: t });
-      await order.save({ transaction: t });
+      await order.update({ status: orderStatus.CANCELLED }, { transaction: t });
       await t.commit();
       res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
     }
@@ -481,12 +478,12 @@ var showCoinLogs = async function (req, res, next) {
     var page = parseInt(req.body.page) || 1; // 默认为第1页
     var pageSize = parseInt(req.body.pageSize) || 10; // 默认每页显示10条
     var offset = (page - 1) * pageSize; // 计算偏移量
-    var coinLogs = await models.coin_log.findAll({
+    var coinLog = await models.coin_log.findAll({
       where: { account_id: req.authData.id, account_type: coinLogs.accountType.USER },
       limit: pageSize,
       offset: offset,
     });
-    res.json({ status: SUCCESS, coinLogs: coinLogs });
+    res.json({ status: SUCCESS, coinLogs: coinLog });
   }
   catch (error) {
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });

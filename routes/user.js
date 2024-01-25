@@ -40,7 +40,7 @@ router.post('/commentOrder', verifyToken, user.commentOrder)//评论订单，传
 
 router.get('/getCommentList', verifyToken, user.getCommentList)//获取评论列表，传入body.advisor.id，pagesize，page
 
-router.post('/tipAdvisor', verifyToken, user.tipAdvisor)//打赏顾问，传入body.id和body.coin
+router.post('/tipOrder', verifyToken, user.tipOrder)//打赏顾问，传入body.id和body.coin
 
 router.post('/favoriteAdvisor', verifyToken, user.favoriteAdvisor)//收藏顾问，传入body.id
 

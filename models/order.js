@@ -65,6 +65,9 @@ module.exports = (sequelize, DataTypes) => {
         is_comment: {
             type: DataTypes.BOOLEAN
         },
+        is_tip: {
+            type: DataTypes.BOOLEAN
+        },
     }, {
         sequelize,
         underscored: true,

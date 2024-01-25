@@ -25,6 +25,7 @@ const errorCode = {
   COMMENT_ALREADY_EXIST: 2011,
   FAVORITE_ALREADY_EXIST: 2012,
   FAVORITE_NOT_FOUND: 2013,
+  ALREADY_TIP: 2014,
   SYNC_ERROR: 9000, //数据库同步错误，可能是处理一项数据时被其他用户修改了
 
 }

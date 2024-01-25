@@ -399,11 +399,25 @@ var cancelOrder = async function (req, res, next) {
   }
 }
 
-var tipAdvisor = async function (req, res, next) {
+var tipOrder = async function (req, res, next) {
   const t = await models.sequelize.transaction();
   try {
-    var advisor = await models.advisor.findByPk(req.body.id);
-    var user = await models.user.findByPk(req.authData.id);
+    const result = await models.sequelize.transaction(async (t) => {
+    var user = await models.user.findByPk(req.authData.id, { transaction: t });
+    var order = await models.order.findOne({ where: { id: req.body.orderid, userid: req.authData.id }, transaction: t});
+    if (!order) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order not found', code: errorCode.ORDER_NOT_FOUND });
+      return;
+    }
+    var advisor = await models.advisor.findByPk(order.advisorid, { transaction: t });
+    if (order.status != orderStatus.FINISHED) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error', code: errorCode.ORDER_STATUS_NOT_MATCH });
+      return;
+    }
+    if (order.is_tip == true) {
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already tipped', code: errorCode.ALREADY_TIP });
+      return;
+    }
     if (user.coin < req.body.coin) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin', code: errorCode.NOT_ENOUGH_COIN });
       return;
@@ -422,21 +436,27 @@ var tipAdvisor = async function (req, res, next) {
       coin_change: req.body.coin,
       action: coinLogs.coinAction.tipAdvisor,
     }, { transaction: t });
+    await order.update({ is_tip: true }, { transaction: t });
     await user.decrement('coin', { by: req.body.coin, transaction: t });
     await advisor.increment('coin', { by: req.body.coin, transaction: t });
-    await t.commit();
-    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
+    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });});
+    return result;
   }
   catch (error) {
-    await t.rollback();
     res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message });
   }
 }
 
 var favoriteAdvisor = async function (req, res, next) {
   try {
-    if (await models.user_fav.findOne({ where: { userid: req.authData.id, advisorid: req.body.id } })) {
+    const fav = await models.user_fav.findOne({ where: { userid: req.authData.id, advisorid: req.body.id } })
+    if (fav && fav.is_del == false) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already favorite', code: errorCode.FAVORITE_ALREADY_EXIST });
+      return;
+    }
+    if (fav && fav.is_del == true) {
+      await models.user_fav.update({ is_del: false }, { where: { userid: req.authData.id, advisorid: req.body.id } });
+      res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
       return;
     }
     await models.user_fav.create({
@@ -452,7 +472,7 @@ var favoriteAdvisor = async function (req, res, next) {
 
 var getFavoriteList = async function (req, res, next) {
   try {
-    var userFav = await models.user_fav.findAll({ where: { userid: req.authData.id } });
+    var userFav = await models.user_fav.findAll({ where: { userid: req.authData.id, is_del: false }, });
     res.json({ status: SUCCESS, favoriteList: userFav });
   }
   catch (error) {
@@ -462,11 +482,12 @@ var getFavoriteList = async function (req, res, next) {
 
 var deleteFavorite = async function (req, res, next) {
   try {
-    if (!await models.user_fav.findOne({ where: { userid: req.authData.id, advisorid: req.body.id } })) {
+    const fav = await models.user_fav.findOne({ where: { userid: req.authData.id, advisorid: req.body.id } })
+    if (!fav||fav.is_del==true) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not favorite', code: errorCode.FAVORITE_NOT_FOUND });
       return;
     }
-    await models.user_fav.destroy({ where: { userid: req.authData.id, advisorid: req.body.id } });
+    await models.user_fav.update({ is_del: true }, { where: { userid: req.authData.id, advisorid: req.body.id } });
     res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   }
   catch (error) {
@@ -506,7 +527,7 @@ module.exports = {
   commentOrder,
   getCommentList,
   cancelOrder,
-  tipAdvisor,
+  tipOrder,
   favoriteAdvisor,
   getFavoriteList,
   deleteFavorite,

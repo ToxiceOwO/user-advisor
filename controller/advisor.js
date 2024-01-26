@@ -345,7 +345,7 @@ var changeAdvisorStatus = async function (req, res, next) {
     res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
   } catch (error) {
     console.log(error);
-    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message, code:errorCode.INVALID_ORDER_TYPE });
+    res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({ status: INTERNAL_ERROR, error: error.message, code: errorCode.INVALID_ORDER_TYPE });
   }
 }//顾问开关顾问状态
 

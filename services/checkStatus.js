@@ -30,7 +30,7 @@ async function schedule() {
             }
             for (var i = 0; i < urgentOrders.length; i++) {
                 let timeUrgent = new Date(urgentOrders[i].time_urgent);
-                let endUrgent = new Date(timeUrgent.getTime() + 60 * 1000);
+                let endUrgent = new Date(timeUrgent.getTime() + 60 * 60 * 1000);
                 let createdAt = new Date(urgentOrders[i].createdAt);
                 let createdAtPlusOneDay = new Date(createdAt.getTime() + 60 * 60 * 1000);
                 if (endUrgent < now) {
@@ -93,20 +93,20 @@ async function refundOrder(order) {
     try {
         const result = await models.sequelize.transaction(async (t) => {
             order = await models.order.findByPk(order.id, { transaction: t });
-        if (order.status != status.PENDING) {
-            throw new Error(9000);
-        }
-        var user = await models.user.findByPk(order.userid);
-        await user.increment('coin', { by: order.price, transaction: t });
-        order.status = status.EXPIRED;
-        await order.save({ transaction: t });
-        await models.coin_log.create({
-            account_type: coinLogs.accountType.USER,
-            account_id: user.id,
-            coin_change: order.price,
-            action: coinLogs.coinAction.refundOrder,
-        }, { transaction: t });
-    });
+            if (order.status != status.PENDING) {
+                throw new Error(9000);
+            }
+            var user = await models.user.findByPk(order.userid);
+            await user.increment('coin', { by: order.price, transaction: t });
+            order.status = status.EXPIRED;
+            await order.save({ transaction: t });
+            await models.coin_log.create({
+                account_type: coinLogs.accountType.USER,
+                account_id: user.id,
+                coin_change: order.price,
+                action: coinLogs.coinAction.refundOrder,
+            }, { transaction: t });
+        });
         return result;
     } catch (error) {
         t.rollback();

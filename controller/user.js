@@ -32,7 +32,7 @@ var login = async function (req, res, next) {
       return;
     };
     if (await bcrypt.compare(req.body.password, user.password)) {
-      var token = jwt.sign({ id: user.id, accountType:0 }, secret, { expiresIn: '24h' });
+      var token = jwt.sign({ id: user.id, accountType: 0 }, secret, { expiresIn: '24h' });
       res.json({ status: SUCCESS, token: token });
     } else {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid login', code: errorCode.PASSWORD_NOT_MATCH });
@@ -403,43 +403,44 @@ var tipOrder = async function (req, res, next) {
   const t = await models.sequelize.transaction();
   try {
     const result = await models.sequelize.transaction(async (t) => {
-    var user = await models.user.findByPk(req.authData.id, { transaction: t });
-    var order = await models.order.findOne({ where: { id: req.body.orderid, userid: req.authData.id }, transaction: t});
-    if (!order) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order not found', code: errorCode.ORDER_NOT_FOUND });
-      return;
-    }
-    var advisor = await models.advisor.findByPk(order.advisorid, { transaction: t });
-    if (order.status != orderStatus.FINISHED) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error', code: errorCode.ORDER_STATUS_NOT_MATCH });
-      return;
-    }
-    if (order.is_tip == true) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already tipped', code: errorCode.ALREADY_TIP });
-      return;
-    }
-    if (user.coin < req.body.coin) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin', code: errorCode.NOT_ENOUGH_COIN });
-      return;
-    }
-    user.coin = user.coin - req.body.coin;
-    advisor.coin = advisor.coin + req.body.coin;
-    await models.coin_log.create({
-      account_type: coinLogs.accountType.USER,
-      account_id: user.id,
-      coin_change: -req.body.coin,
-      action: coinLogs.coinAction.tipAdvisor,
-    }, { transaction: t });
-    await models.coin_log.create({
-      account_type: coinLogs.accountType.ADVISOR,
-      account_id: advisor.id,
-      coin_change: req.body.coin,
-      action: coinLogs.coinAction.tipAdvisor,
-    }, { transaction: t });
-    await order.update({ is_tip: true }, { transaction: t });
-    await user.decrement('coin', { by: req.body.coin, transaction: t });
-    await advisor.increment('coin', { by: req.body.coin, transaction: t });
-    res.json({ status: SUCCESS, code: errorCode.NO_ERROR });});
+      var user = await models.user.findByPk(req.authData.id, { transaction: t });
+      var order = await models.order.findOne({ where: { id: req.body.orderid, userid: req.authData.id }, transaction: t });
+      if (!order) {
+        res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order not found', code: errorCode.ORDER_NOT_FOUND });
+        return;
+      }
+      var advisor = await models.advisor.findByPk(order.advisorid, { transaction: t });
+      if (order.status != orderStatus.FINISHED) {
+        res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Order status error', code: errorCode.ORDER_STATUS_NOT_MATCH });
+        return;
+      }
+      if (order.is_tip == true) {
+        res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Already tipped', code: errorCode.ALREADY_TIP });
+        return;
+      }
+      if (user.coin < req.body.coin) {
+        res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not enough coin', code: errorCode.NOT_ENOUGH_COIN });
+        return;
+      }
+      user.coin = user.coin - req.body.coin;
+      advisor.coin = advisor.coin + req.body.coin;
+      await models.coin_log.create({
+        account_type: coinLogs.accountType.USER,
+        account_id: user.id,
+        coin_change: -req.body.coin,
+        action: coinLogs.coinAction.tipAdvisor,
+      }, { transaction: t });
+      await models.coin_log.create({
+        account_type: coinLogs.accountType.ADVISOR,
+        account_id: advisor.id,
+        coin_change: req.body.coin,
+        action: coinLogs.coinAction.tipAdvisor,
+      }, { transaction: t });
+      await order.update({ is_tip: true }, { transaction: t });
+      await user.decrement('coin', { by: req.body.coin, transaction: t });
+      await advisor.increment('coin', { by: req.body.coin, transaction: t });
+      res.json({ status: SUCCESS, code: errorCode.NO_ERROR });
+    });
     return result;
   }
   catch (error) {
@@ -483,7 +484,7 @@ var getFavoriteList = async function (req, res, next) {
 var deleteFavorite = async function (req, res, next) {
   try {
     const fav = await models.user_fav.findOne({ where: { userid: req.authData.id, advisorid: req.body.id } })
-    if (!fav||fav.is_del==true) {
+    if (!fav || fav.is_del == true) {
       res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Not favorite', code: errorCode.FAVORITE_NOT_FOUND });
       return;
     }

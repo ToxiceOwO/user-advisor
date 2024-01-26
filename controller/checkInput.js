@@ -7,12 +7,12 @@ const errorCode = require('../constants/errorCode');
 async function checkEmail(email, res, next) {
   try {
     if (await models.advisor.findOne({ where: { email: email } })) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Email already exists' ,code:errorCode.DUPLICATE_EMAIL});
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Email already exists', code: errorCode.DUPLICATE_EMAIL });
       return false;
     }
     const re = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
     if (!re.test(String(email).toLowerCase())) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid email',code:errorCode.INVALID_EMAIL });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid email', code: errorCode.INVALID_EMAIL });
       return false;
     };
     return true;
@@ -25,13 +25,13 @@ async function checkEmail(email, res, next) {
 async function checkPhone(phone, res, next) {
   try {
     if (await models.advisor.findOne({ where: { phone: phone } })) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Phone number already exists',code:errorCode.DUPLICATE_PHONE });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Phone number already exists', code: errorCode.DUPLICATE_PHONE });
       return false;
     }
     const re = /^\+?[1-9]\d{1,14}$/;
 
     if (!re.test(String(phone))) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid phone number',code:errorCode.INVALID_PHONE});
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid phone number', code: errorCode.INVALID_PHONE });
       return false;
     }
     return true;
@@ -44,7 +44,7 @@ function checkPassword(password, res, next) {
   try {
     const re = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z]).{8,}$/;
     if (!re.test(String(password))) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid password',code:errorCode.INVALID_PASSWORD });
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid password', code: errorCode.INVALID_PASSWORD });
       return false;
     }
     return true;
@@ -58,7 +58,7 @@ function checkDate(date, res, next) {
   try {
     const re = /^\d{4}-\d{2}-\d{2}$/;
     if (!re.test(String(date))) {
-      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid date' ,code:errorCode.INVALID_DATE});
+      res.status(HttpStatusCodes.FORBIDDEN).json({ status: FAIL, error: 'Invalid date', code: errorCode.INVALID_DATE });
       return false;
     }
     return true;
